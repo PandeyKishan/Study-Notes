@@ -15,7 +15,7 @@ flowchart TD
     subgraph Developer_Workflow["1. Developer & CI/CD Workflow"]
         Dev["Developer Code Push"] -->|git push| GH["Git Repository"]
         GH -->|Webhook Trigger| CI["CI Pipeline: Lint / Test / Build"]
-        CI -->|Container Scan (Trivy)| Sec["Security & Quality Gates"]
+        CI -->|Container Scan - Trivy| Sec["Security & Quality Gates"]
         Sec -->|Push Image| Reg["Container Registry (Docker Hub / GHCR)"]
         Reg -->|GitOps / CD Trigger| CD["CD Pipeline / ArgoCD"]
     end
