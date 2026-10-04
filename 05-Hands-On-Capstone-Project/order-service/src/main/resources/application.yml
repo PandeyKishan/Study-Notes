@@ -1,0 +1,44 @@
+server:
+  port: ${PORT:8080}
+  shutdown: graceful
+
+spring:
+  application:
+    name: order-service
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
+    producer:
+      acks: all
+      retries: 5
+      properties:
+        enable.idempotence: true
+        linger.ms: 10
+        batch.size: 65536
+        compression.type: snappy
+        max.in.flight.requests.per.connection: 5
+
+app:
+  kafka:
+    topic: orders.v1
+    partitions: 3
+    replication-factor: 1
+
+# Spring Boot Actuator for Kubernetes Liveness & Readiness Probes
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true

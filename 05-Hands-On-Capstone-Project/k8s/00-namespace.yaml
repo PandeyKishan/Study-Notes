@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cloudnative-lab
+  labels:
+    environment: learning
+    tier: microservices
