@@ -4,16 +4,16 @@
 FROM maven:3.9.6-eclipse-temurin-21-alpine AS builder
 WORKDIR /workspace
 
-# Cache dependencies
+# Copy pom.xml first to cache Maven dependency downloads
 COPY pom.xml .
 RUN mvn dependency:go-offline -B
 
-# Compile and package application
+# Copy source code and build production jar
 COPY src ./src
 RUN mvn clean package -DskipTests -B
 
 # ========================================================
-# Stage 2: Extract Layered JAR
+# Stage 2: Extract Layered JAR (Dependencies vs App Code)
 # ========================================================
 FROM eclipse-temurin:21-jre-alpine AS extractor
 WORKDIR /extracted
@@ -30,6 +30,7 @@ WORKDIR /application
 RUN addgroup -S spring && adduser -S spring -G spring
 USER spring:spring
 
+# Copy extracted layers (Unchanged layers stay cached!)
 COPY --from=extractor /extracted/app.jar app.jar
 
 ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom" \
@@ -37,6 +38,7 @@ ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava
 
 EXPOSE 8081
 
+# Built-in healthcheck using Spring Boot Actuator
 HEALTHCHECK --interval=20s --timeout=3s --start-period=20s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8081/actuator/health/liveness || exit 1
 

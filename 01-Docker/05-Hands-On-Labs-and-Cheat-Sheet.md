@@ -1,176 +1,129 @@
-# Docker: CLI Cheat Sheet & Practical Hands-On Labs
+# Docker: Advanced CLI, eBPF Tracing & Kernel Hands-On Labs
 
 > **Cluster 01 — Module 05**  
-> Focus: Essential day-to-day command reference, system cleanup, and step-by-step hands-on exercises.
+> Focus: Low-level system exploration, extracting namespaces, interacting with cgroups directly, and container escape forensics.
 
 ---
 
-## 1. Production Docker CLI Cheat Sheet
+## 1. Advanced CLI & Forensics Cheat Sheet
 
-### Container Lifecycle
+### Image & Container Forensics
 ```bash
-# Run container detached with port mapping, custom name, and restart policy
-docker run -d --name web-app -p 8080:80 --restart unless-stopped nginx:alpine
+# Extract an entire container's filesystem to a tarball (even if stopped)
+docker export <container_id> > container_filesystem.tar
 
-# Run container with resource limits and non-root user
-docker run -d --name secure-app \
-  --memory="512m" \
-  --cpus="1.0" \
-  --pids-limit 100 \
-  --user 10001:10001 \
-  --read-only \
-  --tmpfs /tmp \
-  my-image:latest
+# Inspect the underlying overlay2 layers of an image
+docker inspect --format '{{json .GraphDriver.Data}}' my_image | jq .
 
-# Graceful stop with custom timeout (default is 10s)
-docker stop -t 30 <container_id>
-
-# Force terminate immediately
-docker kill <container_id>
-
-# Remove container (add -f to force remove running container)
-docker rm -f <container_id>
+# Find which container process is hogging disk I/O natively
+sudo iotop -a -p $(docker inspect -f '{{.State.Pid}}' <container_id>)
 ```
 
-### Diagnostics & Inspection
+### Network Diagnostics
 ```bash
-# Stream logs with timestamps and limit to last 200 lines
-docker logs -f --tail 200 -t <container_id>
+# View the iptables rules injected by Docker natively on the host
+sudo iptables -t nat -L DOCKER -n -v
 
-# Open an interactive shell inside a running container
-docker exec -it <container_id> /bin/sh
-
-# Show live streaming CPU, memory, and network usage
-docker stats
-
-# Inspect specific JSON properties (e.g. IP address)
-docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' <container_id>
-
-# View filesystem changes made in the container's writable layer
-docker diff <container_id>
-```
-
-### Cleanup & Maintenance
-```bash
-# Clean stopped containers, dangling images, and unused networks
-docker system prune -f
-
-# Nuclear option: remove ALL unused containers, networks, images, and volumes
-docker system prune -a --volumes -f
-
-# Remove all dangling (untagged <none>) images
-docker image prune -f
+# Analyze traffic inside a container's network namespace from the host
+PID=$(docker inspect --format '{{.State.Pid}}' <container_id>)
+sudo nsenter -t $PID -n tcpdump -i eth0 -w capture.pcap
 ```
 
 ---
 
-## 2. Hands-On Lab 1: Multi-Stage Image Optimization
+## 2. Hands-On Lab 1: Manual Namespace Creation (Building a Container from Scratch)
 
 ### Goal
-Experience the drastic reduction in image size, security vulnerabilities, and attack surface by migrating a naive build into a multi-stage build.
+Understand how runc and containerd work by manually creating namespaces using standard Linux utilities, effectively building a "container" without Docker.
 
-### Step 1: Create a sample Node.js application
-Create a directory `lab-app` and add:
+### Steps (Run on a Linux Host or WSL2)
 
-```json
-// package.json
-{
-  "name": "lab-demo",
-  "version": "1.0.0",
-  "main": "server.js",
-  "dependencies": {
-    "express": "^4.19.2"
-  },
-  "devDependencies": {
-    "typescript": "^5.4.5"
-  }
-}
+```bash
+# 1. Download a minimal Alpine root filesystem
+mkdir alpine-rootfs && cd alpine-rootfs
+wget https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/alpine-minirootfs-3.19.1-x86_64.tar.gz
+tar xf alpine-minirootfs-*.tar.gz
+rm alpine-minirootfs-*.tar.gz
+
+# 2. Use unshare to create new Mount, PID, and UTS namespaces
+# Note: Requires root privileges
+sudo unshare --mount --pid --uts --fork
+
+# 3. Inside the new namespace, change the hostname (UTS namespace isolated)
+hostname my-manual-container
+
+# 4. Use pivot_root to safely isolate the mount namespace
+# (Chroot is not used here because pivot_root swaps the actual mount root)
+mount --bind . .  # Satisfy pivot_root requirement
+mkdir -p put_old
+pivot_root . put_old
+cd /
+umount -l put_old
+rmdir put_old
+
+# 5. Mount the proc filesystem (PID namespace requirement)
+mount -t proc proc /proc
+
+# 6. Test your isolation!
+ps aux
+# Notice you only see processes running in this shell, and YOU are PID 1!
 ```
-
-```javascript
-// server.js
-const express = require('express');
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.get('/', (req, res) => res.json({ status: "healthy", timestamp: Date.now() }));
-app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
-```
-
-### Step 2: Compare Naive vs Multi-Stage Build
-**Naive Dockerfile (`Dockerfile.naive`)**:
-```dockerfile
-FROM node:20
-WORKDIR /app
-COPY . .
-RUN npm install
-CMD ["node", "server.js"]
-```
-*Resulting image size:* **~1.1 GB** (includes full Debian OS, build utilities, TypeScript compiler, npm cache).
-
-**Optimized Multi-Stage Dockerfile (`Dockerfile.optimized`)**:
-```dockerfile
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-
-FROM node:20-alpine AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-COPY --from=builder /app/node_modules ./node_modules
-COPY . .
-USER appuser
-EXPOSE 3000
-CMD ["node", "server.js"]
-```
-*Resulting image size:* **~120 MB** (Over **89% reduction** in size and 0 known critical CVEs).
 
 ---
 
-## 3. Hands-On Lab 2: Network Isolation & DNS Discovery
+## 3. Hands-On Lab 2: Directly Throttling CPU with cgroups v2
 
 ### Goal
-Verify that containers on a user-defined bridge network can communicate via hostname, while remaining isolated from other networks.
+Bypass Docker entirely and manually restrict a process's CPU usage using the Linux kernel's cgroup v2 hierarchy.
+
+### Steps
 
 ```bash
-# 1. Create two isolated networks
-docker network create frontend-net
-docker network create backend-net
+# 1. Start a CPU-intensive background process (like a simple while loop)
+cat << 'EOF' > spin.sh
+while true; do :; done
+EOF
+bash spin.sh &
+SPIN_PID=$!
 
-# 2. Start an isolated database on backend-net
-docker run -d --name secure-redis --network backend-net redis:alpine
+# 2. Monitor it using top or htop - it will consume 100% of a core
+top -p $SPIN_PID
 
-# 3. Start a container on frontend-net
-docker run -d --name web-client --network frontend-net alpine sleep 3600
+# 3. Create a new cgroup in the unified hierarchy
+sudo mkdir /sys/fs/cgroup/my_throttle_group
 
-# 4. Attempt to ping redis from web-client (Will FAIL due to network isolation)
-docker exec -it web-client ping -c 2 secure-redis
-# Output: ping: bad address 'secure-redis'
+# 4. Move the process into the cgroup
+echo $SPIN_PID | sudo tee /sys/fs/cgroup/my_throttle_group/cgroup.procs
 
-# 5. Connect web-client to backend-net
-docker network connect backend-net web-client
+# 5. Limit the CPU quota to 20% of a single core (20000 microseconds per 100000 microsecond period)
+echo "20000 100000" | sudo tee /sys/fs/cgroup/my_throttle_group/cpu.max
 
-# 6. Retry ping (SUCCEEDS via Docker's embedded DNS)
-docker exec -it web-client ping -c 2 secure-redis
-# Output: 64 bytes from secure-redis (172.x.x.x): seq=1 ttl=64 time=0.082 ms
+# 6. Re-check top/htop. The process is now hard-throttled to 20.0% CPU!
+top -p $SPIN_PID
+
+# 7. Clean up
+kill $SPIN_PID
+sudo rmdir /sys/fs/cgroup/my_throttle_group
 ```
 
 ---
 
-## 4. Hands-On Lab 3: Inspecting Linux Namespaces & cgroups
+## 4. Hands-On Lab 3: Privilege Escalation (Container Breakout Simulation)
 
-For users on Linux or WSL2, you can verify container isolation directly using host kernel tools:
+### Goal
+Understand why running a container with `--privileged` or mounting the Docker socket is catastrophically dangerous.
+
+**WARNING: Do this on a disposable VM or Sandbox only!**
 
 ```bash
-# Find the host PID of your container
-CONTAINER_PID=$(docker inspect --format '{{.State.Pid}}' <container_id>)
-echo "Host PID is: $CONTAINER_PID"
+# 1. Launch a highly privileged container, mounting the host's root filesystem
+docker run --rm -it --privileged --pid=host -v /:/host_root alpine sh
 
-# Inspect namespaces assigned to this process
-ls -l /proc/$CONTAINER_PID/ns/
+# 2. You are now inside the container. Attempt to use nsenter to break out into the host's PID 1 (systemd)
+nsenter -t 1 -m -u -n -i sh
 
-# Inspect memory limits enforced by cgroups (cgroups v2)
-cat /sys/fs/cgroup/system.slice/docker-<container_id>.scope/memory.max
+# 3. You are now effectively root on the host machine, bypassing the container boundary entirely.
+# Prove it by viewing host-specific files that the container shouldn't see
+cat /etc/shadow
 ```
+*Takeaway:* Never use `--privileged` unless building specialized tooling like DinD (Docker-in-Docker) in heavily isolated CI environments.

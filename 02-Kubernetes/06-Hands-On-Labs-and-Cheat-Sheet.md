@@ -1,55 +1,73 @@
-# Kubernetes: CLI Cheat Sheet & Practical Hands-On Labs
+# Kubernetes: Pro CLI Cheat Sheet & Practical Hands-On Labs
 
 > **Cluster 02 — Module 06**  
-> Focus: Essential `kubectl` operational cheat sheet, local cluster setup (Kind/Minikube), and production workload deployment.
+> Focus: Essential `kubectl` operational cheat sheet, advanced debugging, imperative vs declarative paradigms, CRDs, and production workload deployment.
 
 ---
 
-## 1. Production `kubectl` Cheat Sheet
+## 1. Core Architecture & Workflow
+
+Before diving into the CLI, it is essential to understand how `kubectl` commands interact with the Kubernetes control plane.
+
+```mermaid
+flowchart TD
+    A[Developer/DevOps] -->|kubectl (REST API Calls)| B[API Server]
+    B -->|Persists State| C[(etcd)]
+    B -->|Schedules Pods| D[Kube-Scheduler]
+    B -->|Manages State| E[Controller Manager]
+    B <-->|Commands & Status| F[Kubelet on Worker Node]
+    F -->|Creates Containers| G[Container Runtime]
+    F -->|Manages Networking| H[Kube-Proxy]
+```
+
+---
+
+## 2. Imperative vs. Declarative Management
+
+Kubernetes offers two primary ways to manage resources:
+
+### Imperative Commands
+Operate directly on live objects. Best for quick tests, debugging, or generating template YAMLs.
+* **Pros:** Fast, easy to learn.
+* **Cons:** Not version-controlled, hard to audit or reproduce.
+* **Examples:**
+  * `kubectl run my-pod --image=nginx`
+  * `kubectl create deployment my-dep --image=nginx`
+  * `kubectl expose deployment my-dep --port=80`
+
+### Declarative Configuration
+Define the *desired state* in YAML/JSON files. Kubernetes reconciles the actual state to match the desired state.
+* **Pros:** GitOps friendly, version-controllable, self-documenting, repeatable.
+* **Cons:** Steeper learning curve, requires writing YAML.
+* **Example:** `kubectl apply -f deployment.yaml`
+
+> **Pro Tip:** Combine both! Use imperative commands with `--dry-run=client -o yaml` to generate base manifests, then save and apply declaratively:
+> `kubectl create deployment web --image=nginx --dry-run=client -o yaml > web-deploy.yaml`
+
+---
+
+## 3. Advanced `kubectl` Cheat Sheet & Aliases
+
+### Power Aliases
+Adding these to your `~/.bashrc` or `~/.zshrc` saves hundreds of keystrokes:
+```bash
+alias k='kubectl'
+alias kg='kubectl get'
+alias kd='kubectl describe'
+alias kdel='kubectl delete'
+alias kl='kubectl logs'
+alias kex='kubectl exec -it'
+alias ktx='kubectx' # Requires kubectx
+alias kns='kubens'  # Requires kubectx
+```
 
 ### Context & Configuration
 ```bash
-# Display current context and cluster
-kubectl config current-context
-
-# Switch default namespace for all future commands
-kubectl config set-context --current --namespace=production
-
-# View API resources and their short names
+# View API resources and their short names (e.g., po, deploy, svc)
 kubectl api-resources
-```
 
-### Workload Operations & Rollouts
-```bash
-# Apply declarative configuration
-kubectl apply -f deployment.yaml
-
-# Perform a zero-downtime rolling restart of all pods in a deployment
-kubectl rollout restart deployment/order-service
-
-# Watch status of an in-progress rolling update
-kubectl rollout status deployment/order-service
-
-# Roll back to the previous deployment revision immediately
-kubectl rollout undo deployment/order-service
-
-# Scale deployment replicas
-kubectl scale deployment/order-service --replicas=5
-```
-
-### Debugging & Live Triage
-```bash
-# Stream live logs from all pods matching a label selector
-kubectl logs -l app=order-service -f --tail=100
-
-# Forward local port 8080 to Pod or Service port 3000
-kubectl port-forward service/order-service 8080:3000
-
-# Open interactive shell in a pod
-kubectl exec -it <pod_name> -- /bin/sh
-
-# Launch an ephemeral debug container inside the target pod
-kubectl debug -it <pod_name> --image=nicolaka/netshoot --target=order-service
+# Switch default namespace for all future commands (without kubens)
+kubectl config set-context --current --namespace=production
 ```
 
 ### JSONPath & Resource Filtering Power Tricks
@@ -60,22 +78,74 @@ kubectl get pods -A --field-selector status.phase!=Running,status.phase!=Succeed
 # Print only Pod names and their IP addresses using jsonpath
 kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.podIP}{"\n"}{end}'
 
-# Find which node a specific pod is running on
-kubectl get pod <pod_name> -o jsonpath='{.spec.nodeName}'
+# Sort nodes by memory capacity
+kubectl get nodes --sort-by=.status.capacity.memory
 ```
 
 ---
 
-## 2. Hands-On Lab 1: Local Cluster Setup (Kind / Minikube)
+## 4. Pro-Level Debugging & Live Triage
 
-### Option A: Using `kind` (Kubernetes in Docker - Recommended)
-1. Install `kind`:
+When things go wrong in production, these commands are your lifeline.
+
+```bash
+# Stream live logs from all pods matching a label selector
+kubectl logs -l app=order-service -f --tail=100
+
+# Stream logs for a specific container in a multi-container pod
+kubectl logs <pod_name> -c <container_name> -f
+
+# Port-forwarding: Forward local port 8080 to Pod or Service port 3000
+kubectl port-forward service/order-service 8080:3000
+
+# Run a temporary diagnostic pod (curl/wget/ping)
+kubectl run -it --rm debug-pod --image=radial/busyboxplus:curl -- restart=Never
+```
+
+### Ephemeral Containers (Advanced)
+If a pod crashes on startup or lacks a shell (e.g., distroless images), inject an ephemeral debug container into the running pod's namespace:
+```bash
+# Attach a 'netshoot' container to troubleshoot networking issues
+kubectl debug -it <pod_name> --image=nicolaka/netshoot --target=<container_name>
+```
+
+---
+
+## 5. Custom Resource Definitions (CRDs) & Operators
+
+Kubernetes is extensible. You can define your own resources (CRDs) and build **Operators** (custom controllers) to manage them. This is how databases, message queues, and complex stateful apps are managed natively in K8s.
+
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant API as K8s API Server
+    participant Op as Custom Operator
+    participant Pod as Pods/Services
+
+    Dev->>API: kubectl apply -f custom-db.yaml (CRD Instance)
+    API-->>Op: Watch Event: New DB Resource Created
+    Op->>Op: Reconcile State (Read logic)
+    Op->>API: Create StatefulSet, Service, Secrets
+    API->>Pod: Schedule Pods
+    Pod-->>Op: Status Updates
+    Op->>API: Update CRD Status (Ready)
+```
+* **CRD (Custom Resource Definition):** Extends the Kubernetes API (e.g., creating a `Database` or `Certificate` resource type).
+* **Operator:** A pod running a custom controller that watches CRDs and makes the cluster match the desired state by creating native resources (Pods, Deployments, etc.).
+
+---
+
+## 6. Hands-On Lab 1: Local Cluster Setup (Kind)
+
+`kind` (Kubernetes in Docker) is the industry standard for running local clusters.
+
+1. **Install `kind`:**
    ```bash
-   # Windows (via Chocolatey or Scoop)
+   # Windows (via Chocolatey)
    choco install kind
-   # Or download binary from GitHub releases
    ```
-2. Create multi-node cluster config (`kind-config.yaml`):
+
+2. **Create multi-node cluster config (`kind-config.yaml`):**
    ```yaml
    kind: Cluster
    apiVersion: kind.x-k8s.io/v1alpha4
@@ -84,16 +154,20 @@ kubectl get pod <pod_name> -o jsonpath='{.spec.nodeName}'
      - role: worker
      - role: worker
    ```
-3. Spin up cluster:
+
+3. **Spin up the cluster:**
    ```bash
    kind create cluster --name lab-cluster --config kind-config.yaml
-   kubectl cluster-info --context kind-lab-cluster
+   
+   # Verify nodes
    kubectl get nodes
    ```
 
 ---
 
-## 3. Hands-On Lab 2: Self-Healing Workload with Health Probes
+## 7. Hands-On Lab 2: Self-Healing & Health Probes
+
+Kubernetes keeps apps highly available through health probes.
 
 Create a file named `resilient-app.yaml`:
 
@@ -137,12 +211,14 @@ spec:
             limits:
               cpu: "250m"
               memory: "128Mi"
+          # Readiness Probe: Is the app ready to receive traffic?
           readinessProbe:
             httpGet:
               path: /
               port: 80
             initialDelaySeconds: 3
             periodSeconds: 5
+          # Liveness Probe: Is the app deadlocked/frozen and needs a restart?
           livenessProbe:
             httpGet:
               path: /

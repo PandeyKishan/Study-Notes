@@ -1,170 +1,115 @@
-# Docker: Networking, Storage Volumes & Docker Compose
+# Docker: Networking, Volumes, & Compose (Pro-Level)
 
 > **Cluster 01 — Module 03**  
-> Focus: Linux veth pairs, iptables NAT, user-defined bridge networks, volume persistence types, and Docker Compose orchestration.
+> Focus: Netfilter/iptables rules, L2 vs L3 networking (macvlan/ipvlan), Volume drivers, overlay networking, and advanced Compose orchestration.
 
 ---
 
-## 1. Docker Networking Internals
+## 1. Deep Dive into Network Isolation (iptables & veth)
 
-Docker creates isolated network stacks using the Linux **NET namespace**. To connect containers together and to the outside world, Docker uses virtual ethernet interfaces (`veth`) attached to a software bridge.
+Docker networking relies heavily on Linux `veth` pairs and the `iptables` NAT tables.
 
 ```mermaid
 flowchart TD
-    subgraph Host_System["Host OS Network Stack"]
-        Eth0["Physical Interface: eth0 (Host IP: 192.168.1.50)"]
-        Docker0["Software Bridge: docker0 or user-br (Subnet: 172.20.0.0/16)"]
-        IPTables["Linux iptables / Netfilter (NAT & MASQUERADE)"]
+    subgraph Host["Host Kernel Network Stack"]
+        Eth0["eth0 (Host IP: 192.168.1.50)"]
+        IPTables_PRE["iptables PREROUTING (DNAT)"]
+        IPTables_POST["iptables POSTROUTING (SNAT/Masquerade)"]
+        Bridge["docker0 / user-bridge (172.20.0.1)"]
         
-        Eth0 <--> IPTables
-        IPTables <--> Docker0
+        Eth0 --> IPTables_PRE
+        IPTables_PRE --> Bridge
+        Bridge --> IPTables_POST
+        IPTables_POST --> Eth0
     end
 
-    subgraph Container_A["Container A (NET Namespace)"]
-        EthA["eth0 (IP: 172.20.0.2)"]
+    subgraph ContA["Container A (Net Namespace)"]
+        EthA["eth0 (172.20.0.2)"]
     end
 
-    subgraph Container_B["Container B (NET Namespace)"]
-        EthB["eth0 (IP: 172.20.0.3)"]
-    end
-
-    VethA["vethA (Host peer)"] <-->|Veth Pair Cable| EthA
-    VethB["vethB (Host peer)"] <-->|Veth Pair Cable| EthB
-
-    VethA --- Docker0
-    VethB --- Docker0
-
-    style Host_System fill:#f8fafc,stroke:#64748b,stroke-width:2px
-    style Container_A fill:#ecfdf5,stroke:#10b981,stroke-width:2px
-    style Container_B fill:#eff6ff,stroke:#3b82f6,stroke-width:2px
+    VethA["vethXXXX (Host Peer)"] <--> EthA
+    VethA --- Bridge
 ```
 
-### The 5 Core Network Drivers
+### Advanced Network Drivers
 
-| Driver | Description | Common Use Case |
-| :--- | :--- | :--- |
-| **`bridge`** | Default driver. Creates a virtual switch on the host. Containers get private IPs and communicate over this switch. | Standalone multi-container apps on a single host. |
-| **`host`** | Bypasses container network isolation. Container shares the host's network namespace directly (no port mapping needed). | Extreme low-latency, high-throughput network workloads (e.g. streaming, game servers). |
-| **`none`** | Disables all network interfaces except the loopback (`127.0.0.1`). | Batch processing, offline air-gapped security computations. |
-| **`overlay`** | Creates a multi-host distributed virtual network using VXLAN encapsulation. | Docker Swarm or distributed overlay networking across multiple nodes. |
-| **`macvlan`** | Assigns a real MAC address to the container, making it appear as a physical hardware device on the LAN. | Legacy enterprise applications requiring direct physical IP addressing. |
-
-### Default Bridge vs User-Defined Bridge (Critical Interview Concept)
-
-| Feature | Default `bridge` (`docker0`) | User-Defined Bridge (`docker network create my-net`) |
-| :--- | :--- | :--- |
-| **Automatic DNS Resolution** | ❌ **No**. Containers can only communicate via hardcoded IP addresses. | ✅ **Yes**. Docker runs an embedded DNS server at `127.0.0.11` resolving container names. |
-| **Isolation** | ❌ All containers connect here by default; no security boundary. | ✅ Strict network boundary. Only containers attached to the same network can communicate. |
-| **Live Reconfiguration** | ❌ Requires container recreation to change networks. | ✅ Connect or disconnect containers on the fly (`docker network connect`). |
+| Driver | Mechanics & Use Case |
+| :--- | :--- |
+| **macvlan** | Assigns a real MAC address directly to the container virtual interface. Works at Layer 2. Used when legacy apps require being on the physical subnet without NAT. Containers cannot communicate with the Docker host directly due to kernel security restrictions. |
+| **ipvlan** | Similar to macvlan, but shares the host's MAC address (Layer 3). Ideal for environments where switches restrict multiple MACs per port (port security). |
+| **overlay** | Cross-host networking using VXLAN encapsulation. Requires a key-value store (like Consul, etcd, or Swarm's built-in Raft). Creates a distributed Layer 2 network over a Layer 3 infrastructure. |
+| **host** | No network namespace. Container binds directly to host ports. Zero overhead, highest performance. |
 
 ---
 
-## 2. Storage & Persistence: Volumes vs Bind Mounts vs tmpfs
+## 2. Storage: Persistence & Driver Mechanics
 
-Container filesystems are ephemeral: when a container is removed, all writes in its read-write layer are permanently erased. Docker offers three mechanisms for persistence:
+Volumes bypass the UnionFS overlay. They are directly mounted into the container namespace via the kernel's `mount` mechanism.
 
 ```mermaid
 flowchart LR
-    subgraph Host_Filesystem["Host Operating System Storage"]
-        NamedVol["Managed Docker Volumes\n/var/lib/docker/volumes/<name>/_data"]
-        HostDir["Arbitrary Host Directory\n/home/user/project or C:/data"]
-        RAM["Host RAM (Volatile Memory)"]
+    subgraph Storage["Storage Types"]
+        NamedVol["Docker Managed Volume (Local or NFS)"]
+        BindMount["Host Path (/etc/configs)"]
+        Tmpfs["RAM (tmpfs)"]
     end
 
-    subgraph Container_Filesystem["Container Filesystem View"]
-        VolMount["/app/data (Volume Mount)"]
-        BindMount["/app/code (Bind Mount)"]
-        TmpfsMount["/tmp/cache (tmpfs Mount)"]
+    subgraph Container["Container View"]
+        VolMount["/var/lib/mysql"]
+        BindMount2["/app/config"]
+        TmpfsMount["/tmp/secrets"]
     end
 
-    NamedVol -->|Managed, safe, high performance| VolMount
-    HostDir -->|Direct file binding, dev reload| BindMount
-    RAM -->|Fast, never hits disk, highly secure| TmpfsMount
-
-    style Host_Filesystem fill:#f1f5f9,stroke:#64748b,stroke-width:2px
-    style Container_Filesystem fill:#f0fdf4,stroke:#22c55e,stroke-width:2px
+    NamedVol -->|Bypasses OverlayFS, native IOPS| VolMount
+    BindMount -->|Direct inode access, inode changes affect host| BindMount2
+    Tmpfs -->|Memory-mapped, evaporates on stop| TmpfsMount
 ```
 
-| Type | Managed By | Speed / Performance | Best For |
-| :--- | :--- | :--- | :--- |
-| **Named Volume** | Docker Engine (`/var/lib/docker/volumes`) | Native disk performance | Databases, stateful production workloads, backup-friendly. |
-| **Bind Mount** | Host filesystem path | Dependent on host storage | Development (live code reload like hot-reloading Vite/React/Node). |
-| **`tmpfs` Mount** | Host Memory (RAM) | Memory bus speeds (fastest) | Secrets, tokens, non-persistent cache, high-speed temporary buffers. |
+**Advanced Volume Drivers**: You can use external volume plugins to mount cloud block storage (EBS), distributed file systems (NFS/EFS, GlusterFS), or Ceph block devices directly into containers transparently.
 
 ---
 
-## 3. Docker Compose Orchestration
+## 3. Advanced Docker Compose Orchestration
 
-Docker Compose is a tool for defining and running multi-container Docker applications via declarative YAML files.
+Compose YAML has evolved beyond simple `depends_on`. 
 
-### Key Compose Concepts
-- **`depends_on` with `condition: service_healthy`**: Never rely on simple `depends_on`! A database container starting up does **not** mean it is ready to accept TCP connections. You must configure health checks.
-- **Service Discovery**: Compose automatically creates a user-defined bridge network named `<project_name>_default`. Every service is resolvable by its service name as a DNS hostname.
+### Advanced Healthchecks and Readiness
+Using `service_healthy` ensures dependent services don't start until the database is fully initialized and accepting connections.
 
-### Production Docker Compose Blueprint
+### Compose Watch (Hot Reloading natively)
+Modern Compose supports `x-develop` and `watch` to sync code changes into containers without rebuilding images.
 
 ```yaml
-version: "3.8"
+version: "3.9"
 
 services:
-  # ---------------------------------------------
-  # 1. Message Broker (Apache Kafka in KRaft Mode)
-  # ---------------------------------------------
-  kafka:
-    image: bitnami/kafka:3.7.0
-    container_name: kafka-broker
+  backend:
+    build: .
+    develop:
+      watch:
+        # Sync Python files directly into the container
+        - action: sync
+          path: ./src
+          target: /app/src
+        # Rebuild the image entirely if requirements change
+        - action: rebuild
+          path: ./requirements.txt
     environment:
-      - KAFKA_CFG_NODE_ID=0
-      - KAFKA_CFG_PROCESS_ROLES=controller,broker
-      - KAFKA_CFG_CONTROLLERS=0@kafka:9093
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
-      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - DB_HOST=postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:15
     volumes:
-      - kafka_data:/bitnami/kafka
-    networks:
-      - internal-net
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "/opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server 127.0.0.1:9092 --list"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
       timeout: 5s
       retries: 5
-      start_period: 15s
-
-  # ---------------------------------------------
-  # 2. Producer Backend Service
-  # ---------------------------------------------
-  order-producer:
-    build:
-      context: ./producer-service
-      dockerfile: Dockerfile
-    container_name: order-producer-app
-    ports:
-      - "3000:3000"
-    environment:
-      - PORT=3000
-      - KAFKA_BROKER=kafka:9092
-    networks:
-      - internal-net
-    depends_on:
-      kafka:
-        condition: service_healthy
-    restart: unless-stopped
-
-networks:
-  internal-net:
-    driver: bridge
 
 volumes:
-  kafka_data:
-    driver: local
+  pgdata:
 ```
-
----
-
-## 4. Official References
-- [Docker Network Architecture](https://docs.docker.com/network/)
-- [Docker Storage Volumes Guide](https://docs.docker.com/storage/volumes/)
-- [Docker Compose Specification](https://docs.docker.com/compose/compose-file/)

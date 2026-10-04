@@ -1,111 +1,78 @@
-# CI/CD: Top 20 Interview Questions & Pipeline Troubleshooting
+# CI/CD: Top 20 Interview Questions & Pipeline Troubleshooting (Pro-Level)
 
 > **Cluster 04 — Module 05**  
-> Focus: Senior DevOps interview questions, DevSecOps interview topics, flaky test remediation, and pipeline failure runbooks.
+> Focus: Senior DevOps and DevSecOps interview topics, flaky test remediation, system architecture, and real-world pipeline failure runbooks.
 
 ---
 
-## 1. Top 20 CI/CD & DevOps Interview Questions
+## 1. Top CI/CD & DevOps Interview Questions
 
-### Q1: What is the exact difference between Continuous Delivery and Continuous Deployment?
-**Answer:** In **Continuous Delivery**, every code change passing automated tests is automatically built, packaged, and verified in staging, ready for production deployment at any moment—but the final release to customers requires manual human approval (e.g. clicking "Approve"). In **Continuous Deployment**, there is zero human intervention: any commit that passes automated pipeline gates is immediately released to production users.
+### Q1: Continuous Delivery vs. Continuous Deployment?
+**Answer:** In **Continuous Delivery**, every change passing automated tests is built, packaged, and deployed to staging, perfectly ready for production—but the final release to customers requires manual human approval (e.g., clicking "Approve" in GitHub Environments). In **Continuous Deployment**, there is zero human intervention: any commit passing automated pipeline gates is immediately released to production users. It demands pristine test coverage and automated rollback observability.
 
-### Q2: What is GitOps and why is it superior to push-based CI/CD for Kubernetes?
-**Answer:** GitOps uses Git repositories as the single source of truth for declared infrastructure and application state. An in-cluster operator (like ArgoCD) continuously synchronizes cluster state with Git.  
+### Q2: Why is GitOps superior to push-based CI/CD for Kubernetes?
+**Answer:** GitOps uses Git as the single source of truth for declared infrastructure and application state. An in-cluster operator (like ArgoCD or Flux) continuously pulls and synchronizes cluster state with Git.  
 **Advantages:**
-1. Zero cluster admin credentials exposed to external CI servers.
-2. Automatic detection and remediation of manual configuration drift.
-3. Instantaneous rollbacks via `git revert`.
-4. Native auditability through Git commit logs.
+1. **Security:** Zero cluster admin credentials exposed to external CI servers.
+2. **Self-Healing:** Automatic detection and remediation of manual configuration drift (e.g., someone manually deleting a Pod).
+3. **Rollbacks:** Instantaneous rollbacks via a simple `git revert`.
+4. **Compliance:** Native auditability through Git commit logs.
 
-### Q3: How do you achieve passwordless authentication in CI/CD pipelines?
-**Answer:** Via **OpenID Connect (OIDC)** federated identity. The CI runner requests an ephemeral, cryptographically signed JSON Web Token (JWT) from GitHub's OIDC provider. The runner presents this token to the cloud provider (AWS STS / GCP IAM / Azure AD). The cloud provider validates the signature, verifies repository/branch claims, and issues temporary (15-minute) credentials. No static API keys are ever stored in secrets.
+### Q3: How do you implement passwordless authentication in CI/CD?
+**Answer:** Via **OpenID Connect (OIDC)** federated identity. The CI runner requests an ephemeral, cryptographically signed JSON Web Token (JWT) from GitHub's OIDC provider. The runner presents this token to the cloud provider (AWS STS / GCP IAM). The cloud provider validates the signature, verifies repository/branch claims, and issues temporary (15-minute) credentials. No static API keys are ever stored in secrets, eliminating credential leakage risk.
 
-### Q4: How do you perform database schema updates during a zero-downtime rolling update?
-**Answer:** Using the **Expand-and-Contract (Parallel Run) Pattern**. Never run destructive schema updates (e.g., dropping or renaming columns) simultaneously with application code deployments. First, expand the database by adding new columns as nullable and write to both. Backfill historical data asynchronously. Next, deploy the new application version reading from the new column. Finally, contract the database by dropping the unused old column in a subsequent release.
+### Q4: How do you handle database schema updates during a zero-downtime deployment?
+**Answer:** By using the **Expand-and-Contract (Parallel Run) Pattern**. Destructive schema updates (e.g., dropping or renaming columns) must *never* run concurrently with application code deployments. 
+1. **Expand:** Add new columns as nullable. Deploy code writing to both old and new.
+2. **Migrate:** Backfill historical data asynchronously.
+3. **Transition:** Deploy new code reading exclusively from the new column.
+4. **Contract:** Drop the old column in a later release once old pods are fully terminated.
 
-### Q5: What is the difference between Blue-Green and Canary deployments?
+### Q5: Blue-Green vs. Canary deployments?
 **Answer:**
-- **Blue-Green**: Two identical production environments (Blue = active, Green = idle). The new release is deployed and tested on Green, then traffic is switched 100% all at once. Provides instant rollback, but requires $2\times$ infrastructure resources.
-- **Canary**: A single environment where a tiny percentage of live traffic (e.g., 5%) is routed to the new version. Metrics (error rates, latency) are monitored automatically. If healthy, traffic is incrementally increased (10%, 25%, 100%). Confines blast radius to a small subset of users.
+- **Blue-Green**: Two identical production environments (Blue = active, Green = idle). The new release is deployed and tested on Green, then traffic is switched 100% instantly via an Ingress/Service selector. Provides rapid rollback but costs $2\times$ the infrastructure.
+- **Canary**: A single environment where a tiny percentage of live traffic (e.g., 5%) is routed to the new version. Metrics (error rates, latency) are monitored automatically via tools like Argo Rollouts + Prometheus. If healthy, traffic increments (10% $\to$ 25% $\to$ 100%). Confines blast radius significantly.
 
-### Q6: How do you eliminate "Flaky Tests" in CI?
+### Q6: How do you systematically eliminate "Flaky Tests" in CI?
 **Answer:**
-1. Isolate test dependencies: Replace shared databases with ephemeral test containers (`testcontainers`).
-2. Remove arbitrary sleep timers (`sleep(5)`): Use condition polling with timeouts (`waitForCondition`).
-3. Quarantine flaky tests: Track failure rates, tag flaky tests to run in an advisory suite while investigating, and prevent them from blocking the main production gate.
-4. Run tests in random order to expose state leakage between tests.
+1. **Isolate State**: Replace shared staging databases with ephemeral test containers (`testcontainers`) spun up per test suite.
+2. **Eliminate Race Conditions**: Remove arbitrary sleep timers (`sleep(5)`) and replace with condition polling (`waitForCondition`).
+3. **Quarantine**: Track failure rates, automatically tag flaky tests, and move them to an advisory suite that doesn't block deployments while they are investigated.
+4. **Chaos Testing**: Run tests in random order to expose hidden state leakage between tests.
 
-### Q7: What are the trade-offs between GitHub-hosted and Self-hosted runners?
+### Q7: GitHub-hosted vs. Self-hosted runners (ARC)?
 **Answer:**
-- **GitHub-hosted**: Clean, ephemeral VM per job (high security, zero maintenance), but limited compute specs and higher cost for massive enterprise workloads.
-- **Self-hosted**: Run on your own VPC/Kubernetes (Actions Runner Controller - ARC), custom hardware (GPUs, huge RAM), access to private VPC networks—but requires maintenance, patching, and security isolation between untrusted public PRs.
+- **GitHub-hosted**: Clean, ephemeral VM per job (high security, zero maintenance). Cons: Limited compute, shared IP spaces (bad for strict firewalls), and higher cost at scale.
+- **Self-hosted (ARC - Actions Runner Controller)**: Run inside your own Kubernetes clusters. Pros: Access to private VPC resources, custom hardware (GPUs), and unlimited scale. Cons: Requires maintenance, patching, and rigorous security isolation (using ephemeral pods) to prevent untrusted PRs from escaping the runner.
 
-### Q8: What is the difference between SAST, DAST, and SCA?
+### Q8: Differentiate SAST, DAST, and SCA.
 **Answer:**
-- **SAST (Static Application Security Testing)**: Scans source code without executing it to detect bugs, injection vulnerabilities, and bad coding patterns (e.g. CodeQL, SonarQube).
-- **SCA (Software Composition Analysis)**: Analyzes open-source dependencies and third-party packages for known vulnerabilities/CVEs and license compliance (e.g. Snyk, Dependabot).
-- **DAST (Dynamic Application Security Testing)**: Scans running web applications from the outside by sending simulated attacks (e.g. OWASP ZAP) to find runtime vulnerabilities.
+- **SAST (Static Application Security Testing)**: White-box testing. Scans source code without executing it for injection vulnerabilities and bad practices (e.g., SonarQube, CodeQL).
+- **SCA (Software Composition Analysis)**: Analyzes the supply chain (open-source dependencies) for known vulnerabilities/CVEs and license compliance (e.g., Snyk, Dependabot).
+- **DAST (Dynamic Application Security Testing)**: Black-box testing. Scans running applications from the outside by sending simulated malicious payloads (e.g., OWASP ZAP).
 
-### Q9: What is Trivy and what is the difference between OS packages and language-specific dependencies?
-**Answer:** Trivy is an open-source vulnerability scanner. When scanning an image, it inspects two distinct layers:
-1. **OS Packages**: Installed via system package managers (`apt`, `apk`, `yum`), such as `openssl` or `glibc`.
-2. **Language Dependencies**: Installed via language package managers, such as `package-lock.json` (npm), `pom.xml` (Maven), or `requirements.txt` (pip).
+### Q9: What is an SBOM and why is it legally critical?
+**Answer:** A Software Bill of Materials (SBOM) is a formal, machine-readable specification (in SPDX or CycloneDX format) listing all software components, third-party libraries, binaries, and licensing details included in an artifact. Following executive orders on cybersecurity, it is mandated for enterprise compliance to rapidly audit exposure to zero-day vulnerabilities (e.g., Log4Shell).
 
-### Q10: How does Docker BuildKit caching work in GitHub Actions?
-**Answer:** BuildKit allows exporting cache layers to external storage (like GitHub Actions cache backend or a container registry) via `--cache-to=type=gha` and `--cache-from=type=gha`. Unchanged layers are downloaded directly from the cache rather than recompiled from scratch.
-
-### Q11: What is an SBOM (Software Bill of Materials)?
-**Answer:** A formal machine-readable specification (in SPDX or CycloneDX format) listing all software components, third-party libraries, binaries, and licensing details included in an application artifact. Mandated for federal and enterprise cybersecurity compliance to audit exposure to zero-day vulnerabilities (e.g. Log4Shell).
-
-### Q12: How does container signing with Sigstore Cosign work?
-**Answer:** Cosign signs container images using public-key cryptography. In modern "keyless" mode, Cosign utilizes OIDC to verify the identity of the developer or CI runner, requests a short-lived signing certificate from the Fulcio Certificate Authority, and records the signature in the Rekor public transparency log.
-
-### Q13: What is the purpose of `concurrency` in GitHub Actions?
-**Answer:** It groups workflow executions by a key (e.g. `workflow_name + branch_ref`). If a developer pushes commit B while commit A is still building in the pipeline, `cancel-in-progress: true` automatically aborts commit A's run, freeing runner resources and preventing out-of-order deployments.
-
-### Q14: What is Trunk-Based Development and why is it preferred over GitFlow?
-**Answer:** In Trunk-Based Development, developers merge small, frequent commits into the single `main` branch multiple times a day using short-lived feature branches (< 1 day) and feature flags. This eliminates large, high-conflict merges ("merge hell"), drastically reduces lead time, and accelerates feedback loops.
-
-### Q15: What is the difference between GitHub Actions Caching and Artifacts?
-**Answer:**
-- **Cache (`actions/cache`)**: Reusable data across different workflow runs to speed up builds (e.g., `~/.npm`, `~/.m2`, compiler caches). Caches may be evicted when storage limits are reached.
-- **Artifacts (`actions/upload-artifact`)**: Immutable files produced during a specific workflow run (e.g., compiled binaries, test coverage reports, release tars) intended for auditing or download.
-
-### Q16: How do you debug a failed CI step when logs don't provide enough information?
-**Answer:**
-1. Re-run the job with **Enable debug logging** checked (sets `ACTIONS_RUNNER_DEBUG=true`).
-2. Run an interactive shell in the exact container environment locally using `act` (a tool to run GitHub Actions locally with Docker).
-3. Insert debugging inspection steps (e.g. `env`, `df -h`, `pwd`, `ls -la`).
-
-### Q17: What are GitHub Environments and Environment Protection Rules?
-**Answer:** Environments represent deployment targets (e.g., `staging`, `production`). Protection rules allow requiring mandatory manual approvers, limiting deployments to specific protected branches (e.g., only `main`), and defining environment-specific secrets.
-
-### Q18: What is Semantic Versioning (SemVer) and how is it automated in CI?
-**Answer:** SemVer follows the format `MAJOR.MINOR.PATCH`:
-- `MAJOR`: Breaking API changes.
-- `MINOR`: Backward-compatible new features.
-- `PATCH`: Backward-compatible bug fixes.  
-Automated using tools like **Semantic Release**, which parses commit messages adhering to the Conventional Commits specification (`feat:`, `fix:`, `feat!:`) to determine the next version bump and generate changelogs automatically.
-
-### Q19: How do you design an automated rollback mechanism?
-**Answer:**
-1. In Kubernetes: Run `kubectl rollout undo deployment/<name>` triggered automatically if post-deployment smoke tests fail.
-2. In Progressive Delivery (Argo Rollouts / Flagger): Operators monitor Prometheus metrics (HTTP 5xx rate, p99 latency). If metrics violate SLO thresholds during the canary phase, the operator automatically aborts and routes 100% traffic back to the stable replica.
-
-### Q20: How do you prevent secret leakage in CI/CD?
-**Answer:**
-1. Enforce local pre-commit hooks using `gitleaks` or `trufflehog`.
-2. Mask secrets in pipeline logs automatically via the CI platform.
-3. Run automated secret scanners on pull requests to block merges if hardcoded keys or tokens are detected.
-4. Rotate any compromised secrets immediately and invalidate git commit history if necessary.
+### Q10: How does container signing (Cosign) protect the supply chain?
+**Answer:** Cosign signs container images using public-key cryptography. In "keyless" mode, it utilizes OIDC to verify the identity of the CI runner, requests a short-lived signing certificate from the Fulcio CA, and records the signature in the Rekor transparency log. Kubernetes Admission Controllers (like Kyverno) verify this signature before allowing a pod to start, preventing compromised images from running.
 
 ---
 
-## 2. Common CI/CD Failures & Triage Runbook
+## 2. CI/CD Failures & Triage Runbook (Pro-Tier)
 
-| Failure | Symptom | Root Cause | Solution |
-| :--- | :--- | :--- | :--- |
-| **No Space Left on Device** | `docker: failed to register layer: no space left` | Runner disk filled with old Docker layers and dangling volumes | Add a cleanup step at the start of the job: `docker system prune -af --volumes` |
-| **Permission Denied on Docker Socket** | `Got permission denied while trying to connect to the Docker daemon socket` | Runner user is not a member of the `docker` group | Add runner user to docker group: `sudo usermod -aG docker $USER` or run with rootless Docker |
-| **Cache Corruption** | `npm ERR! checksum failure` | Stored cache key corrupted or partial upload | Change the cache key version suffix (e.g. `v1-deps` $\to$ `v2-deps`) to force a clean cache bust |
+| Error Message / Symptom | Root Cause Diagnosis | Remediation Strategy |
+| :--- | :--- | :--- |
+| `docker: failed to register layer: no space left on device` | The CI runner disk is saturated with old Docker layers, cache, and dangling volumes. | Prepend a cleanup step to the workflow: `docker system prune -af --volumes` or increase runner EBS volume size. |
+| `Got permission denied while trying to connect to the Docker daemon socket` | The CI runner user is not a member of the `docker` group, lacking socket permissions. | Run `sudo usermod -aG docker $USER` during runner bootstrap, or switch to rootless Docker / Podman. |
+| `npm ERR! checksum failure` / Build acts unexpectedly | Cache Poisoning or Cache Corruption in `actions/cache`. The restored cache contains corrupted binaries. | Bust the cache manually by modifying the cache key version (e.g., `v1-node-deps` $\to$ `v2-node-deps`) in the YAML. |
+| Workflow canceled automatically after 5 minutes | `concurrency` setting with `cancel-in-progress: true` triggered because a newer commit was pushed to the same branch. | Expected behavior. If undesired for specific critical deployments, remove the `concurrency` block for that job. |
+| `OIDC provider rejected the request` | The IAM Trust Policy does not correctly match the repository name or branch claims in the JWT. | Verify the `Condition` block in the AWS/GCP role strictly matches `repo:my-org/my-repo:ref:refs/heads/main`. |
+| Flaky UI Tests (Cypress/Playwright) timing out | Runner is CPU-starved, causing browser rendering to slow down and hit timeouts before elements appear. | Upgrade to a larger GitHub runner (e.g., `ubuntu-latest-8-cores`) or optimize test parallelization. |
+
+---
+
+## 3. Official References
+- [GitHub Actions Runner Controller (ARC)](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners-with-actions-runner-controller)
+- [OIDC Federation in CI/CD](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect)
+- [Google DORA Metrics](https://dora.dev/)

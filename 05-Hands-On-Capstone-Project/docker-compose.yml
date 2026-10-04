@@ -1,96 +1,44 @@
-version: "3.8"
+version: '3.8'
 
 services:
-  # ========================================================
-  # 1. Apache Kafka Broker (KRaft Mode - No ZooKeeper needed!)
-  # ========================================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
   kafka:
-    image: bitnami/kafka:3.7.0
-    container_name: capstone-kafka
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - zookeeper
     ports:
       - "9092:9092"
-      - "9093:9093"
     environment:
-      - KAFKA_CFG_NODE_ID=0
-      - KAFKA_CFG_PROCESS_ROLES=controller,broker
-      - KAFKA_CFG_CONTROLLERS=0@kafka:9093
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
-      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
-    volumes:
-      - kafka_kraft_data:/bitnami/kafka
-    networks:
-      - cloudnative-net
-    healthcheck:
-      test: ["CMD-SHELL", "/opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server 127.0.0.1:9092 --list"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
-  # ========================================================
-  # 2. Spring Boot Producer Service (Order REST API)
-  # ========================================================
   order-service:
     build:
       context: ./order-service
-      dockerfile: Dockerfile
-    container_name: capstone-order-service
     ports:
       - "8080:8080"
     environment:
+      - KAFKA_BROKERS=kafka:29092
       - PORT=8080
-      - KAFKA_BROKERS=kafka:9092
-      - APP_KAFKA_TOPIC=orders.v1
-    networks:
-      - cloudnative-net
     depends_on:
-      kafka:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/actuator/health/liveness || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    restart: unless-stopped
+      - kafka
 
-  # ========================================================
-  # 3. Spring Boot Consumer Service (Notification Listener)
-  # ========================================================
   notification-service:
     build:
       context: ./notification-service
-      dockerfile: Dockerfile
-    container_name: capstone-notification-service
-    ports:
-      - "8081:8081"
     environment:
+      - KAFKA_BROKERS=kafka:29092
       - PORT=8081
-      - KAFKA_BROKERS=kafka:9092
-      - APP_KAFKA_TOPIC=orders.v1
-      - SPRING_KAFKA_CONSUMER_GROUP_ID=notification-group
-    networks:
-      - cloudnative-net
     depends_on:
-      kafka:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8081/actuator/health/liveness || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    restart: unless-stopped
-
-networks:
-  cloudnative-net:
-    name: cloudnative-network
-    driver: bridge
-
-volumes:
-  kafka_kraft_data:
-    name: capstone_kafka_data
+      - kafka

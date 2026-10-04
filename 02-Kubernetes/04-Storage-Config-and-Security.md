@@ -1,116 +1,147 @@
 # Kubernetes: Storage, Configs, Secrets & RBAC Security
 
 > **Cluster 02 — Module 04**  
-> Focus: PV/PVC binding lifecycle, StorageClasses, ConfigMaps, Secrets, RBAC authorization, and Pod Security Standards.
+> Focus: PV/PVC binding lifecycle, StorageClasses, Container Storage Interface (CSI), ConfigMaps, Secrets, RBAC authorization, OIDC, Pod Security Standards, and KMS encryption.
 
 ---
 
-## 1. Kubernetes Storage Architecture: PV, PVC & StorageClasses
+## 1. Advanced Kubernetes Storage: CSI & PV/PVC Binding Lifecycle
 
-Because container filesystems are ephemeral, persistent state requires decoupled storage volumes managed by the Container Storage Interface (CSI).
+Kubernetes originally relied on "in-tree" volume plugins for cloud providers, resulting in tight coupling and slow feature delivery. The **Container Storage Interface (CSI)** abstracts storage into out-of-tree plugins, enabling standard interfaces for block and file storage systems.
+
+### The PV/PVC Binding Lifecycle
+
+The lifecycle of persistent storage involves several critical phases and actors, shifting from developer abstraction to hardware realization.
 
 ```mermaid
-flowchart LR
-    Dev["Developer (Application Team)"] -->|Declares need for 50Gi| PVC["PersistentVolumeClaim (PVC)\n'I need 50Gi ReadWriteOnce'"]
-    SC["StorageClass\n(e.g., gp3-csi, local-path)\nProvisioner: ebs.csi.aws.com"] -->|Dynamic Provisioning| PV["PersistentVolume (PV)\nRepresents actual cloud disk / EBS volume"]
-    PVC <-->|Bound 1-to-1| PV
-    Pod["Application Pod"] -->|Mounts PVC as Volume| PVC
+sequenceDiagram
+    participant Dev as Developer
+    participant PVC as PersistentVolumeClaim
+    participant K8s as Kubernetes API
+    participant SC as StorageClass
+    participant CSI as CSI Driver (e.g., ebs.csi.aws.com)
+    participant Cloud as Cloud Provider (AWS EBS)
+    participant PV as PersistentVolume
 
-    style PVC fill:#e0f2fe,stroke:#0284c7,stroke-width:2px
-    style PV fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
-    style SC fill:#f3e8ff,stroke:#9333ea,stroke-width:2px
-    style Pod fill:#ecfdf5,stroke:#10b981,stroke-width:2px
+    Dev->>K8s: Create PVC (e.g., 50Gi, RWO)
+    K8s->>PVC: Register Claim
+    K8s->>SC: Lookup provisioner
+    SC->>CSI: trigger VolumeProvision
+    CSI->>Cloud: API Call to create Disk
+    Cloud-->>CSI: Disk created (vol-01234)
+    CSI->>K8s: Create PV object representing Disk
+    K8s->>PV: Register PV
+    K8s->>K8s: Bind PVC to PV (Status: Bound)
+    K8s-->>Dev: Ready for Pod use
 ```
 
 ### Storage Access Modes
-- **`ReadWriteOnce` (RWO)**: Volume can be mounted as read-write by a **single node**. (Default for AWS EBS, Azure Disk).
-- **`ReadOnlyMany` (ROX)**: Volume can be mounted read-only by **many nodes** simultaneously.
-- **`ReadWriteMany` (RWX)**: Volume can be mounted read-write by **many nodes** simultaneously (e.g. NFS, AWS EFS, CephFS).
-- **`ReadWriteOncePod` (RWOP)**: Mountable as read-write by a single Pod only.
+- **`ReadWriteOnce` (RWO)**: Mounted as read-write by a **single node**. Standard for AWS EBS or Azure Disk.
+- **`ReadOnlyMany` (ROX)**: Mounted read-only by **many nodes**.
+- **`ReadWriteMany` (RWX)**: Mounted read-write by **many nodes** simultaneously. Requires shared file systems like NFS, AWS EFS, or CephFS.
+- **`ReadWriteOncePod` (RWOP)**: Mountable as read-write by a single Pod only. Introduced in K8s 1.22 for stronger isolation.
 
-### Reclaim Policies
-- **`Delete` (Default)**: When PVC is deleted, the underlying storage backend (e.g., AWS EBS volume) is permanently deleted.
-- **`Retain`**: When PVC is deleted, the PV remains in `Released` state. Data is preserved for manual recovery.
+### Volume Binding Modes
+- **`Immediate`**: Storage is provisioned the moment the PVC is created. (Can cause issues if storage is provisioned in AZ-A, but the Pod gets scheduled to AZ-B).
+- **`WaitForFirstConsumer`**: Provisioning is delayed until a Pod using the PVC is scheduled. This guarantees the volume is created in the exact same Availability Zone (AZ) as the Pod's node.
 
 ---
 
-## 2. ConfigMaps and Secrets
+## 2. ConfigMaps and Secrets: Under the Hood
 
-Configuration must be decoupled from application image artifacts according to 12-factor application guidelines.
+To adhere to the 12-factor app methodology, configuration and sensitive data are injected into Pods at runtime.
 
 ```mermaid
 flowchart TD
-    subgraph K8s_Configs["Cluster Configuration Objects"]
-        CM["ConfigMap\nNon-sensitive configurations\n(PORT, LOG_LEVEL, TOPIC_NAME)"]
-        Sec["Secret\nSensitive credentials\n(DB_PASSWORD, KAFKA_SASL_KEY)"]
+    subgraph Storage["etcd Storage Backend"]
+        etcd[(etcd Cluster)]
     end
 
-    subgraph Pod_Injection["Pod Injection Modes"]
-        Env["1. Environment Variables (valueFrom)\nEvaluated at container startup"]
-        Vol["2. Projected Volume Mounts\nMounted as files in directory"]
+    subgraph Configs["K8s Objects"]
+        CM["ConfigMap\n(Cleartext Config)"]
+        Sec["Secret\n(Base64 Encoded Credentials)"]
     end
 
+    subgraph Pod_Runtime["Pod Injection"]
+        Env["Environment Variables\n(Evaluated on startup)"]
+        Vol["Projected Volumes\n(tmpfs / mounted as files)"]
+    end
+
+    Configs -->|Saved in| etcd
     CM --> Env
     CM --> Vol
     Sec --> Env
     Sec --> Vol
 
-    style CM fill:#eff6ff,stroke:#3b82f6,stroke-width:1px
-    style Sec fill:#fef2f2,stroke:#ef4444,stroke-width:1px
+    style etcd fill:#cbd5e1,stroke:#475569,stroke-width:2px
 ```
 
+### How K8s Secrets Actually Work
 > [!WARNING]
-> **Base64 is NOT Encryption!**  
-> Kubernetes Secrets are stored in `etcd` as Base64-encoded strings by default. Anyone with API access to read secrets can decode them via `echo "cGFzc3dvcmQ=" | base64 -d`.  
-> **Production Best Practice**: Enable etcd encryption-at-rest (`EncryptionConfiguration`) and use the **External Secrets Operator (ESO)** to sync secrets securely from AWS Secrets Manager, HashiCorp Vault, or Azure Key Vault.
+> **Base64 is NOT Encryption!**
+> By default, Secrets are stored in `etcd` as Base64-encoded plain text. Anyone with raw `etcd` access or API `get` access on secrets can decode them trivially.
+
+### KMS Encryption at Rest (Pro-Level)
+To secure secrets, Kubernetes supports **Encryption at Rest** using a Key Management Service (KMS) provider.
+1. K8s API server intercepts the Secret write request.
+2. It sends the Secret data to an external KMS (e.g., AWS KMS, HashiCorp Vault) for envelope encryption.
+3. The KMS returns an encrypted payload (ciphertext).
+4. K8s stores this ciphertext in `etcd`.
+Even if `etcd` is compromised, the attacker cannot read the secrets without the external KMS key.
 
 ---
 
-## 3. RBAC (Role-Based Access Control)
+## 3. RBAC, OIDC, and Identity Management
 
-Kubernetes uses RBAC to determine whether an entity (User or ServiceAccount) can perform a specific **verb** (`get`, `list`, `create`, `delete`) on a **resource** (`pods`, `services`, `secrets`).
+Kubernetes **Role-Based Access Control (RBAC)** authorizes API requests, but Kubernetes itself **does not manage users**. It relies on external identity providers like **OIDC (OpenID Connect)**.
+
+### The Identity Flow (OIDC)
 
 ```mermaid
-flowchart TD
-    subgraph Identity["1. Subject (Who?)"]
-        SA["ServiceAccount: order-deployer-sa\n(Namespace: production)"]
-    end
+flowchart LR
+    User["Developer / CLI"] -->|1. Auth via SSO| IdP["OIDC Provider\n(Okta, Dex, Google)"]
+    IdP -->|2. Returns JWT Token| User
+    User -->|3. API Request + JWT| API["kube-apiserver"]
+    API -->|4. Verify JWT Signature| IdP
+    API -->|5. Check RBAC| RBAC["RBAC Engine"]
 
-    subgraph Permissions["2. Role / ClusterRole (What?)"]
-        R["Role: pod-manager\napiGroups: ['']\nresources: ['pods']\nverbs: ['get', 'list', 'watch', 'create']"]
-    end
-
-    subgraph Binding["3. RoleBinding (Bridge)"]
-        RB["RoleBinding: bind-order-deployer\nConnects Subject to Role"]
-    end
-
-    SA --> RB
-    RB --> R
-
-    style SA fill:#eff6ff,stroke:#3b82f6,stroke-width:2px
-    style R fill:#ecfdf5,stroke:#10b981,stroke-width:2px
-    style RB fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
+    style User fill:#f8fafc,stroke:#94a3b8
+    style IdP fill:#fef08a,stroke:#eab308
+    style API fill:#e0f2fe,stroke:#0284c7
 ```
 
-### Namespace Scoped vs Cluster Scoped
-- **`Role` + `RoleBinding`**: Confined strictly to a single Kubernetes namespace.
-- **`ClusterRole` + `ClusterRoleBinding`**: Cluster-wide permissions (Nodes, PersistentVolumes, Namespaces, or resources across all namespaces).
+### RBAC Core Components
+- **`Role` / `ClusterRole`**: The *What*. Defines allowed API groups, resources, and verbs (e.g., `get pods`, `create deployments`).
+- **`ServiceAccount` / `User` / `Group`**: The *Who*. The subject requesting access.
+- **`RoleBinding` / `ClusterRoleBinding`**: The *Bridge*. Binds the subject to the role.
+
+> [!TIP]
+> **Principle of Least Privilege**: Never grant `cluster-admin` globally. Use finely scoped `RoleBindings` restricted to specific namespaces whenever possible.
 
 ---
 
-## 4. Hardening Workloads with SecurityContext
+## 4. Pod Security Standards (PSS) & Hardening
 
-Production workloads should enforce the **Restricted** Pod Security Standard:
+Historically handled by PodSecurityPolicies (PSP), security is now managed by **Pod Security Admission (PSA)** implementing **Pod Security Standards (PSS)**.
+
+### Pod Security Levels
+1. **Privileged**: Unrestricted policy, typically for system-level or infrastructure workloads (e.g., CNI plugins, CSI drivers).
+2. **Baseline**: Minimally restrictive policy preventing known privilege escalations.
+3. **Restricted**: Highly restrictive, enforcing strict Pod hardening best practices.
+
+### Example: A Hardened Workload (Restricted Level)
 
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: hardened-app
+  namespace: secure-ns
 spec:
   replicas: 2
   template:
     spec:
+      # Enforce User/Group IDs to prevent root execution
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -123,22 +154,22 @@ spec:
           image: myapp:1.0.0
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
+            readOnlyRootFilesystem: true  # Prevent runtime modifications to filesystem
             capabilities:
               drop:
-                - ALL
+                - ALL                     # Drop all Linux capabilities
           volumeMounts:
-            - name: writable-temp
+            - name: tmp-volume
               mountPath: /tmp
       volumes:
-        - name: writable-temp
-          emptyDir: {}
+        - name: tmp-volume
+          emptyDir: {}                    # Provide writable /tmp for readOnlyRootFilesystem
 ```
 
 ---
 
 ## 5. Official References
-- [Kubernetes Storage Overview](https://kubernetes.io/docs/concepts/storage/)
-- [Configuring Pods with Secrets](https://kubernetes.io/docs/concepts/configuration/secret/)
-- [Using RBAC Authorization](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)
+- [Kubernetes CSI Documentation](https://kubernetes.io/docs/concepts/storage/volumes/#csi)
+- [Encrypting Secret Data at Rest](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/)
+- [OIDC Authentication in Kubernetes](https://kubernetes.io/docs/reference/access-authn-authz/authentication/#openid-connect-tokens)
 - [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/)

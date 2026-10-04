@@ -1,32 +1,44 @@
-# Kubernetes: Networking, Services, Ingress & Network Policies
+# Kubernetes: Advanced Networking, Services, Ingress & Gateway API
 
 > **Cluster 02 — Module 03**  
-> Focus: Kubernetes Flat Network Model, Service types, Headless Services for Kafka, CoreDNS resolution, Ingress controllers, and zero-trust NetworkPolicies.
+> Focus: Kubernetes Flat Network Model, Container Network Interface (CNI), kube-proxy (iptables/IPVS), CoreDNS, Ingress vs Gateway API, and zero-trust NetworkPolicies.
 
 ---
 
-## 1. The Kubernetes Networking Model
+## 1. The Kubernetes Networking Model & CNI
 
-Kubernetes imposes four foundational networking rules across all nodes:
-1. **Pod-to-Pod**: Every Pod receives a unique, routable IP address within the cluster. Pods can communicate with every other Pod across any node without Network Address Translation (NAT).
-2. **Node-to-Pod**: Nodes can communicate directly with all Pods running on them or other nodes without NAT.
-3. **No Port Clashes**: Because every Pod has its own IP, multiple Pods on the same node can bind to port `8080` without conflict.
+Kubernetes imposes fundamental networking requirements designed to create a flat, highly routable topology.
+
+### The Core Rules
+1. **Pod-to-Pod**: Every Pod receives a unique, routable IP address within the cluster. Pods communicate across any node without Network Address Translation (NAT).
+2. **Node-to-Pod**: Nodes can communicate directly with all Pods (and vice versa) without NAT.
+3. **No Port Clashes**: Each Pod has its own IP, meaning applications inside different Pods on the same node can bind to the same port (e.g., `8080`) without conflict.
+
+### Under the Hood: CNI (Container Network Interface)
+The implementation of these rules is delegated to **CNI Plugins** (like Calico, Cilium, Flannel). 
+- **IPAM (IP Address Management)**: The CNI allocates a pod CIDR to each node and hands out IPs to pods.
+- **Veth Pairs**: A virtual ethernet pair connects the Pod's network namespace to the host's root network namespace.
+- **Routing/Encapsulation**: Traffic between nodes is handled via overlay networks (VXLAN/Geneve) or unencapsulated BGP routing.
 
 ```mermaid
 flowchart TD
     subgraph Node_1["Worker Node 1 (IP: 192.168.1.10)"]
-        PodA["Pod A (IP: 10.244.1.5)"]
-        Bridge1["cbr0 / CNI Bridge"]
-        PodA <--> Bridge1
+        direction TB
+        PodA["Pod A (IP: 10.244.1.5)\nNetwork NS"]
+        VethA["veth-pair (Host NS)"]
+        Bridge1["cni0 / Bridge"]
+        PodA <-->|veth| VethA <--> Bridge1
     end
 
     subgraph Node_2["Worker Node 2 (IP: 192.168.1.20)"]
-        PodB["Pod B (IP: 10.244.2.8)"]
-        Bridge2["cbr0 / CNI Bridge"]
-        PodB <--> Bridge2
+        direction TB
+        PodB["Pod B (IP: 10.244.2.8)\nNetwork NS"]
+        VethB["veth-pair (Host NS)"]
+        Bridge2["cni0 / Bridge"]
+        PodB <-->|veth| VethB <--> Bridge2
     end
 
-    Bridge1 <-->|Overlay Network: VXLAN / Geneve / BGP Routing| Bridge2
+    Bridge1 <-->|Overlay (VXLAN) / Underlay (BGP)| Bridge2
 
     style Node_1 fill:#f8fafc,stroke:#64748b,stroke-width:1px
     style Node_2 fill:#f8fafc,stroke:#64748b,stroke-width:1px
@@ -36,139 +48,114 @@ flowchart TD
 
 ---
 
-## 2. Kubernetes Services: Types & Mechanisms
+## 2. Services & kube-proxy: The Load Balancing Engine
 
-Pods are ephemeral; their IPs change whenever they restart. A **Service** provides a stable virtual IP (VIP) and DNS name acting as an internal load balancer pointing to dynamic Pod IPs selected via labels.
+Pods are ephemeral; a **Service** provides a stable Virtual IP (VIP) and DNS name. This abstraction is heavily powered by **kube-proxy**, a daemon running on every node.
+
+### kube-proxy Modes
+- **iptables (Default)**: kube-proxy configures netfilter/iptables rules. Traffic destined for a Service VIP is intercepted by iptables in the kernel, NATed, and load-balanced (randomly) to a backend Pod IP. It scales decently but rule evaluation is linear ($O(n)$).
+- **IPVS (Advanced)**: Uses the IP Virtual Server in the Linux kernel. IPVS uses hash tables ($O(1)$), meaning significantly better performance for clusters with thousands of services. Supports advanced algorithms (rr, lc, dh, sh).
 
 ```mermaid
 flowchart LR
-    Client["Client / Other Pod"] -->|HTTP :80| VIP["Service Virtual IP (ClusterIP)\ne.g. 10.96.0.100"]
-    VIP -->|kube-proxy iptables / IPVS round-robin| Pod1["Pod 1 (10.244.1.12:3000)"]
-    VIP -->|kube-proxy iptables / IPVS round-robin| Pod2["Pod 2 (10.244.2.18:3000)"]
-    VIP -->|kube-proxy iptables / IPVS round-robin| Pod3["Pod 3 (10.244.3.4:3000)"]
+    Client["Client Pod"] -->|HTTP :80| VIP["Service VIP\n10.96.0.100"]
+    VIP -->|kube-proxy (iptables/IPVS)\nDNAT & LB| Pod1["Pod 1 (10.244.1.12:80)"]
+    VIP -->|kube-proxy (iptables/IPVS)\nDNAT & LB| Pod2["Pod 2 (10.244.2.18:80)"]
 
     style VIP fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
-    style Pod1 fill:#f0fdf4,stroke:#22c55e,stroke-width:1px
-    style Pod2 fill:#f0fdf4,stroke:#22c55e,stroke-width:1px
-    style Pod3 fill:#f0fdf4,stroke:#22c55e,stroke-width:1px
 ```
 
-### The 4 Service Types
+### Service Types
 
-| Service Type | Routing Scope | Behavior |
+| Type | Routing Scope | Mechanism |
 | :--- | :--- | :--- |
-| **`ClusterIP`** | Cluster-Internal only | Default type. Allocates an internal virtual IP reachable only from within the cluster. |
-| **`NodePort`** | Cluster-External | Opens a static port on every physical node (range `30000-32767`). Traffic to `<NodeIP>:<NodePort>` routes to the Service. |
-| **`LoadBalancer`** | Cluster-External | Integrates with cloud providers (AWS NLB, GCP LB, Azure LB) to provision a public load balancer routing into NodePorts. |
-| **`Headless` (`clusterIP: None`)** | Cluster-Internal | Allocates **no** virtual IP. CoreDNS directly returns the individual A-records of all backing Pods. |
+| **`ClusterIP`** | Cluster-Internal | Allocates an internal VIP. Reachable only within the cluster. |
+| **`NodePort`** | Cluster-External | Opens a static port (`30000-32767`) on all nodes. iptables routes `<NodeIP>:<NodePort>` to the Service. |
+| **`LoadBalancer`** | Cluster-External | Triggers cloud controller (AWS/GCP) to create an external LB pointing to NodePorts. |
+| **`Headless` (`clusterIP: None`)** | Cluster-Internal | No VIP allocated. DNS returns the A records of the individual Pod IPs. |
 
-### Why Headless Services are Mandatory for Kafka & Distributed Databases
-In stateful systems like Kafka or Cassandra, clients cannot send writes to an arbitrary random broker. A producer writing to partition 0 must connect directly to the specific broker hosting the partition leader.  
-With a **Headless Service**:
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: kafka-headless
-spec:
-  clusterIP: None
-  selector:
-    app: kafka
-  ports:
-    - port: 9092
-      name: plaintext
-```
-CoreDNS generates individual predictable DNS records for each StatefulSet pod:
-- `kafka-0.kafka-headless.default.svc.cluster.local` $\to$ `10.244.1.20`
-- `kafka-1.kafka-headless.default.svc.cluster.local` $\to$ `10.244.2.22`
-- `kafka-2.kafka-headless.default.svc.cluster.local` $\to$ `10.244.3.25`
+> **Pro Tip: Headless Services for Stateful Workloads**
+> Stateful apps (Kafka, Cassandra) require clients to connect to specific nodes (e.g., partition leaders). A headless service generates predictable DNS records (`kafka-0.kafka-headless...`) allowing direct Pod addressing without kube-proxy interference.
 
 ---
 
-## 3. CoreDNS Resolution Syntax
+## 3. CoreDNS and Name Resolution
 
-Every service is registered in cluster DNS using its Fully Qualified Domain Name (FQDN):
-
+CoreDNS translates Service names to IPs. The structure is:
 $$\mathbf{\langle service\text{-}name\rangle.\langle namespace\rangle.svc.cluster.local}$$
 
-- Within the same namespace: `curl http://order-service:3000`
-- Across namespaces: `curl http://order-service.payments.svc.cluster.local:3000`
+- Inside the same namespace: `curl http://orders`
+- Cross-namespace: `curl http://orders.payments.svc.cluster.local`
+
+**The `ndots:5` Issue**: By default, `/etc/resolv.conf` in pods appends multiple search domains (like `.default.svc.cluster.local`) if a queried domain has fewer than 5 dots. This can cause high DNS query amplification for external domain lookups.
 
 ---
 
-## 4. Ingress & Ingress Controllers (Layer 7 Routing)
+## 4. Layer 7 Routing: Ingress vs. Gateway API
 
-While Services operate at Layer 4 (TCP/UDP), **Ingress** manages Layer 7 HTTP/HTTPS external access into the cluster:
+Services operate at Layer 4. For HTTP/HTTPS routing (path-based routing, TLS termination), we use Layer 7 controllers.
+
+### Ingress Controllers
+An Ingress resource defines the routing rules, while an Ingress Controller (e.g., NGINX, Traefik) implements them by watching the API server and dynamically updating its reverse-proxy config.
+
+### Gateway API (The Future)
+The Gateway API is the modern evolution of Ingress. It offers a role-oriented, richer set of CRDs (`GatewayClass`, `Gateway`, `HTTPRoute`).
 
 ```mermaid
 flowchart TD
-    Internet["Public Traffic (Internet)"] --> LB["Cloud Load Balancer / DNS (*.company.com)"]
-    LB --> IC["Ingress Controller (NGINX / Traefik / Envoy Pods)"]
+    Internet["Public Traffic"] --> LB["Cloud LB"]
+    LB --> Gateway["Gateway (Envoy/Traefik)"]
     
-    IC -->|Path: /api/v1/orders| Svc1["Order Service (ClusterIP)"]
-    IC -->|Path: /api/v1/notifications| Svc2["Notification Service (ClusterIP)"]
+    Gateway -->|HTTPRoute: /api/v1/orders| Svc1["Order Service"]
+    Gateway -->|HTTPRoute: /api/v1/users| Svc2["User Service"]
+    
+    subgraph "Role Separation"
+        Admin["Infra Admin\nCreates GatewayClass & Gateway"]
+        Dev["Developer\nCreates HTTPRoute"]
+    end
 
-    style IC fill:#eff6ff,stroke:#3b82f6,stroke-width:2px
-    style Svc1 fill:#ecfdf5,stroke:#10b981,stroke-width:1px
-    style Svc2 fill:#ecfdf5,stroke:#10b981,stroke-width:1px
-```
+    Admin -.-> Gateway
+    Dev -.-> Gateway
 
-```yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: app-ingress
-  annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-spec:
-  ingressClassName: nginx
-  rules:
-    - host: api.example.com
-      http:
-        paths:
-          - path: /orders
-            pathType: Prefix
-            backend:
-              service:
-                name: order-service
-                port:
-                  number: 3000
+    style Gateway fill:#eff6ff,stroke:#3b82f6,stroke-width:2px
 ```
 
 ---
 
 ## 5. NetworkPolicies (Zero-Trust Security)
 
-By default, all pods in Kubernetes can talk to all other pods. A **NetworkPolicy** acts as an internal packet firewall (requires a CNI like Calico or Cilium).
+By default, all Pods can talk to all other Pods. **NetworkPolicies** provide micro-segmentation at Layer 3/4. 
+- Enforced by the CNI (e.g., Calico uses iptables, Cilium uses eBPF).
+- Operates on labels, not IPs.
 
-### Production Example: Default Deny All + Allow Only Kafka Producers
+### Example: Default Deny + Specific Allow
 ```yaml
-# 1. Deny all incoming traffic to Kafka pods by default
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: kafka-isolate
+  name: api-isolation
+  namespace: prod
 spec:
   podSelector:
     matchLabels:
-      app: kafka
+      app: backend-api
   policyTypes:
     - Ingress
   ingress:
-    # Allow ONLY pods labeled 'role: producer' on port 9092
+    # Allow traffic ONLY from frontend pods
     - from:
         - podSelector:
             matchLabels:
-              role: producer
+               tier: frontend
       ports:
         - protocol: TCP
-          port: 9092
+          port: 8080
 ```
 
 ---
 
 ## 6. Official References
 - [Kubernetes Network Model](https://kubernetes.io/docs/concepts/services-networking/)
-- [DNS for Services and Pods](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/)
-- [Ingress Controllers Documentation](https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/)
+- [Kube-Proxy and iptables/IPVS](https://kubernetes.io/docs/reference/networking/virtual-ips/)
+- [Gateway API](https://gateway-api.sigs.k8s.io/)
 - [Network Policies Guide](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
