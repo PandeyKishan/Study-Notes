@@ -1,129 +1,199 @@
-# Docker: Advanced CLI, eBPF Tracing & Kernel Hands-On Labs
+# Docker: Hands-On Labs & Essential Command Cheat Sheet
 
 > **Cluster 01 — Module 05**  
-> Focus: Low-level system exploration, extracting namespaces, interacting with cgroups directly, and container escape forensics.
+> **Level**: Beginner Step-by-Step Walkthrough to Advanced Kernel Labs  
+> **Key References**: TechWorld with Nana, Docker CLI Official Reference
 
 ---
 
-## 1. Advanced CLI & Forensics Cheat Sheet
+## 📋 1. The Everyday Docker Command Cheat Sheet
 
-### Image & Container Forensics
+### Container Management
 ```bash
-# Extract an entire container's filesystem to a tarball (even if stopped)
-docker export <container_id> > container_filesystem.tar
+# Run a container in detached mode with port mapping and a custom name
+docker run -d --name web-server -p 8080:80 nginx:alpine
 
-# Inspect the underlying overlay2 layers of an image
-docker inspect --format '{{json .GraphDriver.Data}}' my_image | jq .
+# List active containers
+docker ps
 
-# Find which container process is hogging disk I/O natively
-sudo iotop -a -p $(docker inspect -f '{{.State.Pid}}' <container_id>)
+# List ALL containers (including stopped ones)
+docker ps -a
+
+# View real-time container resource usage (CPU, RAM, Network I/O)
+docker stats
+
+# Stream logs in real-time
+docker logs -f web-server
+
+# Open an interactive shell inside a running container
+docker exec -it web-server sh
+
+# Stop and gracefully terminate a container
+docker stop web-server
+
+# Force kill and remove a container
+docker rm -f web-server
 ```
 
-### Network Diagnostics
+### Image Management
 ```bash
-# View the iptables rules injected by Docker natively on the host
-sudo iptables -t nat -L DOCKER -n -v
+# Build an image from Dockerfile in current directory
+docker build -t my-app:1.0 .
 
-# Analyze traffic inside a container's network namespace from the host
-PID=$(docker inspect --format '{{.State.Pid}}' <container_id>)
-sudo nsenter -t $PID -n tcpdump -i eth0 -w capture.pcap
+# List local images
+docker images
+
+# Tag an image for Docker Hub or GitHub Container Registry (GHCR)
+docker tag my-app:1.0 username/my-app:1.0
+
+# Push image to registry
+docker push username/my-app:1.0
+
+# Remove an image
+docker rmi my-app:1.0
+
+# View history of layers and their sizes
+docker history my-app:1.0
+```
+
+### Networks & Volumes
+```bash
+# Create a custom bridge network (with built-in DNS)
+docker network create app-network
+
+# List networks
+docker network ls
+
+# Create a persistent volume
+docker volume create db-data
+
+# Inspect volume details (reveals host mount path)
+docker volume inspect db-data
+
+# Nuclear cleanup: Remove all stopped containers, unused networks, and dangling images
+docker system prune -af --volumes
 ```
 
 ---
 
-## 2. Hands-On Lab 1: Manual Namespace Creation (Building a Container from Scratch)
+## 🧪 2. Beginner Lab 1: Your First Container with Persistence & Networking
 
-### Goal
-Understand how runc and containerd work by manually creating namespaces using standard Linux utilities, effectively building a "container" without Docker.
-
-### Steps (Run on a Linux Host or WSL2)
+### Objective
+Deploy a PostgreSQL database and a lightweight Node/Python app, connect them using a custom Docker network, and verify data persists across container restarts.
 
 ```bash
-# 1. Download a minimal Alpine root filesystem
-mkdir alpine-rootfs && cd alpine-rootfs
+# Step 1: Create a dedicated network
+docker network create test-net
+
+# Step 2: Create a named volume for the database
+docker volume create test-pgdata
+
+# Step 3: Run PostgreSQL on the custom network with the volume mounted
+docker run -d \
+  --name postgres-db \
+  --network test-net \
+  -e POSTGRES_PASSWORD=secret \
+  -e POSTGRES_DB=mydb \
+  -v test-pgdata:/var/lib/postgresql/data \
+  postgres:15-alpine
+
+# Step 4: Verify the database is running
+docker ps
+
+# Step 5: Connect to the DB from a temporary client container using the hostname 'postgres-db'
+docker run --rm -it --network test-net postgres:15-alpine \
+  psql -h postgres-db -U postgres -d mydb -c "CREATE TABLE users (id SERIAL, name TEXT); INSERT INTO users (name) VALUES ('Alice');"
+
+# Step 6: Test persistence: Kill and destroy the database container!
+docker rm -f postgres-db
+
+# Step 7: Spin up a brand new container using the same volume
+docker run -d \
+  --name postgres-db-new \
+  --network test-net \
+  -e POSTGRES_PASSWORD=secret \
+  -e POSTGRES_DB=mydb \
+  -v test-pgdata:/var/lib/postgresql/data \
+  postgres:15-alpine
+
+# Step 8: Query the database. Your data is still there!
+docker run --rm -it --network test-net postgres:15-alpine \
+  psql -h postgres-db-new -U postgres -d mydb -c "SELECT * FROM users;"
+```
+
+---
+
+## 🧪 3. Beginner Lab 2: Multi-Container Orchestration with Docker Compose
+
+Create a `docker-compose.yml` file:
+```yaml
+version: "3.8"
+
+services:
+  web:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./html:/usr/share/nginx/html
+    restart: always
+
+  redis:
+    image: redis:alpine
+    volumes:
+      - redis-cache:/data
+
+volumes:
+  redis-cache:
+```
+
+### Run and Test:
+```bash
+# 1. Start the entire application stack in the background
+docker compose up -d
+
+# 2. Check running services
+docker compose ps
+
+# 3. View live logs
+docker compose logs -f
+
+# 4. Tear down everything cleanly
+docker compose down -v
+```
+
+---
+
+## 🔬 4. Advanced Lab: Building a "Container" Manually with Linux Primitives
+
+*(For Senior Interview Preparation)*
+
+### Objective
+Understand that containers are not magic by creating an isolated environment using standard Linux utilities without Docker!
+
+```bash
+# Run inside Linux terminal or WSL2:
+mkdir -p /tmp/mini-rootfs && cd /tmp/mini-rootfs
+
+# 1. Download Alpine minirootfs
 wget https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/alpine-minirootfs-3.19.1-x86_64.tar.gz
-tar xf alpine-minirootfs-*.tar.gz
-rm alpine-minirootfs-*.tar.gz
+tar xf alpine-minirootfs-*.tar.gz && rm alpine-minirootfs-*.tar.gz
 
-# 2. Use unshare to create new Mount, PID, and UTS namespaces
-# Note: Requires root privileges
-sudo unshare --mount --pid --uts --fork
+# 2. Unshare PID, Mount, and UTS namespaces
+sudo unshare --mount --pid --uts --fork /bin/sh
 
-# 3. Inside the new namespace, change the hostname (UTS namespace isolated)
-hostname my-manual-container
+# 3. Change isolated hostname
+hostname my-diy-container
 
-# 4. Use pivot_root to safely isolate the mount namespace
-# (Chroot is not used here because pivot_root swaps the actual mount root)
-mount --bind . .  # Satisfy pivot_root requirement
+# 4. Pivot root filesystem
 mkdir -p put_old
 pivot_root . put_old
 cd /
-umount -l put_old
-rmdir put_old
+umount -l put_old && rmdir put_old
 
-# 5. Mount the proc filesystem (PID namespace requirement)
+# 5. Mount proc filesystem for process tree isolation
 mount -t proc proc /proc
 
-# 6. Test your isolation!
+# 6. Check processes. You are PID 1 inside your custom container!
 ps aux
-# Notice you only see processes running in this shell, and YOU are PID 1!
 ```
-
----
-
-## 3. Hands-On Lab 2: Directly Throttling CPU with cgroups v2
-
-### Goal
-Bypass Docker entirely and manually restrict a process's CPU usage using the Linux kernel's cgroup v2 hierarchy.
-
-### Steps
-
-```bash
-# 1. Start a CPU-intensive background process (like a simple while loop)
-cat << 'EOF' > spin.sh
-while true; do :; done
-EOF
-bash spin.sh &
-SPIN_PID=$!
-
-# 2. Monitor it using top or htop - it will consume 100% of a core
-top -p $SPIN_PID
-
-# 3. Create a new cgroup in the unified hierarchy
-sudo mkdir /sys/fs/cgroup/my_throttle_group
-
-# 4. Move the process into the cgroup
-echo $SPIN_PID | sudo tee /sys/fs/cgroup/my_throttle_group/cgroup.procs
-
-# 5. Limit the CPU quota to 20% of a single core (20000 microseconds per 100000 microsecond period)
-echo "20000 100000" | sudo tee /sys/fs/cgroup/my_throttle_group/cpu.max
-
-# 6. Re-check top/htop. The process is now hard-throttled to 20.0% CPU!
-top -p $SPIN_PID
-
-# 7. Clean up
-kill $SPIN_PID
-sudo rmdir /sys/fs/cgroup/my_throttle_group
-```
-
----
-
-## 4. Hands-On Lab 3: Privilege Escalation (Container Breakout Simulation)
-
-### Goal
-Understand why running a container with `--privileged` or mounting the Docker socket is catastrophically dangerous.
-
-**WARNING: Do this on a disposable VM or Sandbox only!**
-
-```bash
-# 1. Launch a highly privileged container, mounting the host's root filesystem
-docker run --rm -it --privileged --pid=host -v /:/host_root alpine sh
-
-# 2. You are now inside the container. Attempt to use nsenter to break out into the host's PID 1 (systemd)
-nsenter -t 1 -m -u -n -i sh
-
-# 3. You are now effectively root on the host machine, bypassing the container boundary entirely.
-# Prove it by viewing host-specific files that the container shouldn't see
-cat /etc/shadow
-```
-*Takeaway:* Never use `--privileged` unless building specialized tooling like DinD (Docker-in-Docker) in heavily isolated CI environments.

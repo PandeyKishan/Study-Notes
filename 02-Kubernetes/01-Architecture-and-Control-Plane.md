@@ -1,195 +1,292 @@
-# Kubernetes: Pro-Level Architecture, Control Plane & Node Internals
+# Kubernetes: Architecture, Control Plane & Node Internals
 
 > **Cluster 02 — Module 01**  
-> Focus: Kubernetes internals, distributed system architecture, control loop mechanics, etcd Raft consensus, API server flow, scheduler algorithms, and the node-level CRI/CNI/CSI ecosystem.
+> **Level**: Beginner Foundations to Production & FAANG-Level Deep Dive  
+> **Key References**: TechWorld with Nana, Kubernetes Official Docs, Borg Paper (Google)
 
 ---
 
-## 1. High-Level Cluster Architecture & The Declarative Model
+## 🌱 0. The Beginner's Mental Model: Why Do We Need Kubernetes?
 
-At its core, Kubernetes is a distributed, declarative state machine. It does not imperatively execute commands; instead, it constantly drives the **actual state** of the cluster towards a user-defined **desired state** via independent, asynchronous reconciliation loops.
+### The Question Every Beginner Asks:
+*"Docker runs containers great on my laptop. Why do we need Kubernetes?"*
+
+Docker is fantastic for running a few containers on a single computer. But imagine you work at Netflix, Uber, or an e-commerce platform with **1,000 microservice containers** spread across **50 production servers**:
+- **What happens when Server #3 dies or suffers a hardware failure at 2:00 AM?** Who wakes up to restart those 40 containers on another server?
+- **What happens on Black Friday when website traffic surges by 500%?** Who manually spins up 50 new container replicas and wires them into the load balancer?
+- **How do you roll out a new version of your software with ZERO downtime** while millions of active users are purchasing items?
+- **How do containers discover each other** when servers are constantly being added and removed?
+
+Docker alone cannot solve these problems. You need a **Container Orchestrator**.
+
+---
+
+### The Real-World Analogy: The Orchestra Conductor & Ship Captain
+*(Popularized in TechWorld with Nana)*
+
+- **The Musicians (Containers)**: Each musician (violinist, drummer, pianist) is highly skilled and plays their instrument independently (Node.js, PostgreSQL, Redis).
+- **The Problem**: Without someone in charge, musicians play at different speeds, wander off stage, or when the lead violinist faints, nobody knows what to do.
+- **The Conductor (Kubernetes)**:
+  - Stands on the podium, reads the sheet music (**Desired State / YAML Manifest**).
+  - Watches the entire orchestra (**Cluster**).
+  - Signals musicians to play faster during crescendos (**Auto-scaling**).
+  - Instantly subs in a replacement violinist if one drops their bow (**Self-Healing & Auto-Restart**).
 
 ```mermaid
 flowchart TD
-    subgraph Control_Plane["Control Plane (Highly Available Quorum)"]
-        API["kube-apiserver\n(REST API, AuthN/AuthZ, Admission, Watch)"]
-        ETCD["etcd Cluster\n(Distributed Raft KV Store, MVCC)"]
-        Sched["kube-scheduler\n(Predicates/Priorities, Node Binding)"]
-        KCM["kube-controller-manager\n(Control Loops, Garbage Collection)"]
-        CCM["cloud-controller-manager\n(Cloud IAM/VPC/LB Integration)"]
+    subgraph Analogy["Real-World Analogy: The Orchestra Conductor"]
+        Conductor["Kubernetes (The Conductor)\nReads sheet music & directs the stage"]
+        Violin["Violinist (Web Pod)"]
+        Drums["Drummer (API Pod)"]
+        Piano["Pianist (Database Pod)"]
 
-        API <-->|gRPC/HTTP| ETCD
-        API <-->|Watch/REST| Sched
-        API <-->|Watch/REST| KCM
-        API <-->|Watch/REST| CCM
+        Conductor -->|Keeps in sync| Violin
+        Conductor -->|Keeps in sync| Drums
+        Conductor -->|Keeps in sync| Piano
     end
 
-    subgraph Data_Plane["Data Plane (Worker Nodes)"]
-        subgraph Node_1["Worker Node (Node 1)"]
-            Kubelet1["kubelet\n(Node Agent, PLEG, cgroups)"]
-            Proxy1["kube-proxy\n(iptables/IPVS Service Routing)"]
-            Runtime1["Container Runtime\n(containerd/CRI-O)"]
-            CNI1["CNI Plugin\n(Calico/Cilium)"]
-            Pod1["Pod (App + Pause)"]
+    subgraph Production["Production Cluster Reality"]
+        K8s["Kubernetes Control Plane"]
+        Node1["Worker Node 1 (20 Containers)"]
+        Node2["Worker Node 2 (20 Containers)"]
+        Node3["Worker Node 3 (20 Containers)"]
 
-            Kubelet1 -->|CRI (gRPC)| Runtime1
-            Runtime1 --> Pod1
-            Kubelet1 -->|CNI| CNI1
-            Proxy1 -.-> Pod1
-        end
-
-        subgraph Node_2["Worker Node (Node 2)"]
-            Kubelet2["kubelet"]
-            Runtime2["Runtime"]
-            Pod2["Pod"]
-            Kubelet2 -->|CRI| Runtime2
-            Runtime2 --> Pod2
-        end
+        K8s -->|Schedules & Heals| Node1
+        K8s -->|Schedules & Heals| Node2
+        K8s -->|Schedules & Heals| Node3
     end
 
-    API <==>|mTLS / Watch API| Kubelet1
-    API <==>|mTLS / Watch API| Kubelet2
-
-    style Control_Plane fill:#f0f9ff,stroke:#0284c7,stroke-width:2px
-    style Data_Plane fill:#f8fafc,stroke:#64748b,stroke-width:1px
+    style Conductor fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px
+    style K8s fill:#dcfce7,stroke:#16a34a,stroke-width:2px
 ```
 
----
-
-## 2. Deep Dive: Control Plane Components
-
-### 2.1 `kube-apiserver`: The Central Nervous System
-The API server is the only component that persists state to `etcd`. It acts as a stateless, horizontally scalable REST/gRPC gateway.
-- **API Request Lifecycle**:
-  1. **Authentication (AuthN)**: Who is making the request? (X.509 certs, OIDC, ServiceAccount tokens).
-  2. **Authorization (AuthZ)**: Can they do it? (RBAC - Roles/RoleBindings).
-  3. **Mutating Admission Control**: Webhooks intercept the request and can alter the payload (e.g., injecting sidecars like Istio, adding default labels).
-  4. **Object Schema Validation**: Validates the JSON/YAML structure against OpenAPI schemas.
-  5. **Validating Admission Control**: Final checks, rejecting requests that violate policies (e.g., OPA Gatekeeper/Kyverno policies).
-  6. **Persistence**: Saves the object to `etcd`.
-- **The Watch API**: Clients open long-lived HTTP GET requests with chunked transfer encoding (gRPC streams internally). Instead of polling, `apiserver` pushes events to clients when objects change in `etcd`.
-
-### 2.2 `etcd`: The State Store & Raft Consensus
-`etcd` is a distributed, strictly consistent key-value store.
-- **Raft Consensus**: Uses a leader-follower architecture. Writes are proposed to the leader, logged, and replicated to followers. A write is only committed when a quorum ($N/2 + 1$) acknowledges it.
-- **MVCC (Multi-Version Concurrency Control)**: `etcd` doesn't just store the current value; it stores revisions. This allows the API server to watch for changes from a specific `resourceVersion` without missing updates.
-- **Compaction**: Because MVCC stores history, `etcd` requires periodic compaction to remove old revisions and prevent disk exhaustion.
-- **Quorum Rules**: Always run 3, 5, or 7 nodes. 3 nodes tolerate 1 failure; 5 tolerate 2. Adding a 4th node decreases stability (still tolerates 1 failure but requires 3 acks instead of 2).
-
-### 2.3 `kube-controller-manager`: The Reconciliation Engine
-A monolithic binary running dozens of distinct, independent control loops.
-- **The Reconciliation Loop Pattern**:
-  ```go
-  for {
-      desiredState := getDesiredStateFromAPIServer()
-      actualState := getActualStateFromCluster()
-      if actualState != desiredState {
-          executeRemediationTasks()
-      }
-      time.Sleep(interval)
-  }
-  ```
-- Uses **Informers** and **ListerWatchers** (client-go cache) to monitor API server events efficiently without overwhelming it with GET requests.
-- **Work Queues**: Events (Add/Update/Delete) are pushed to rate-limited work queues. Worker threads pop items off the queue and trigger the `Reconcile(req)` function.
-
-### 2.4 `kube-scheduler`: The Node Allocator
-Finds optimal nodes for unbound Pods (`nodeName: ""`).
-- **Two-Phase Scheduling Framework**:
-  1. **Filtering (Predicates)**: Hard constraints. Drops nodes lacking CPU/RAM, matching `nodeSelector`/`affinity`, or having untolerated `taints`.
-  2. **Scoring (Priorities)**: Soft constraints. Ranks remaining nodes (0-100). Prefers spreading pods across failure domains (TopologySpreadConstraints), image locality, or node utilization levels.
-- **Binding**: Once a node is selected, the scheduler emits a `Binding` object to the API server, updating the Pod's `nodeName`.
+> **The Golden Definition**:  
+> **Kubernetes (K8s)** is an open-source container orchestration platform that automates the **deployment, scaling, networking, and self-healing** of containerized applications across a cluster of servers.
 
 ---
 
-## 3. Worker Node Internals: The Data Plane
+## ⚡ 1. Before vs. After: Why Kubernetes is Essential
 
-### 3.1 `kubelet`: The Node Agent
-The `kubelet` ensures containers described in PodSpecs are running and healthy.
-- **Sync Loop**: Receives PodSpecs via the API Watch stream or static pod manifests (from `/etc/kubernetes/manifests`).
-- **PLEG (Pod Lifecycle Event Generator)**: Instead of constantly polling the container runtime (which is expensive), PLEG periodically relists containers and generates events (ContainerStarted, ContainerDied) to trigger the `kubelet` sync loop.
-- **cgroups & Namespaces**: The `kubelet` interacts with Linux primitives. It sets up `cgroups` (for resource limits: CPU shares, memory limits) and instructs the runtime to create namespaces (IPC, Network, PID).
+| Scenario / Challenge | Before Kubernetes (Manual Docker / Bare Metal) | After Kubernetes (Automated Orchestration) | Why This Helps (The Impact) |
+| :--- | :--- | :--- | :--- |
+| **Server Crash at 2 AM** | Server dies $\rightarrow$ PagerDuty alerts wake up engineer $\rightarrow$ 45 minutes of downtime to manually SSH and restart containers. | K8s detects dead node $\rightarrow$ automatically reschedules all pods to healthy nodes in **under 30 seconds**. | True self-healing; engineers sleep peacefully; 99.99% uptime. |
+| **Traffic Spike / Flash Sale** | Manual server provisioning $\rightarrow$ load balancer reconfiguration $\rightarrow$ site slows down or crashes under load. | **Horizontal Pod Autoscaler (HPA)** detects CPU/traffic rise $\rightarrow$ scales pods from 5 to 50 automatically in seconds. | Elastic scaling handle flash traffic without manual intervention. |
+| **Deploying New Versions** | Scheduled maintenance windows at midnight $\rightarrow$ "Website under maintenance" downtime banner for users. | **Zero-Downtime Rolling Updates**: Spins up new version pods, verifies health checks, then safely drains old pods. | Deploy to production multiple times a day without impacting users. |
+| **Networking & Discovery** | Hardcoding IP addresses; manual reverse-proxy updates when IPs change. | **Kubernetes Services & CoreDNS**: Stable virtual IP and DNS name (`http://order-service`) that never changes. | Microservices find each other seamlessly regardless of pod restarts. |
+| **Resource Optimization** | Underutilized servers running at 10% CPU, wasting thousands of cloud dollars. | Intelligent **Bin-Packing (Scheduler)** packs containers onto nodes based on requested CPU and RAM. | Slashes cloud infrastructure costs by 40% to 60%. |
 
-### 3.2 The CRI, CNI, and CSI Interfaces
-Kubernetes relies on standard gRPC interfaces to avoid baking vendor-specific code into the core repository.
+---
+
+## 🏛️ 2. The Complete Cluster Architecture: Control Plane & Worker Nodes
+
+A Kubernetes cluster is divided into two distinct planes:
+1. **The Control Plane (The Brains / Management)**: Decides what runs where.
+2. **The Worker Nodes (The Muscle / Workers)**: Where your actual application containers run.
 
 ```mermaid
-flowchart LR
-    Kubelet["kubelet"]
-    
-    subgraph Interfaces["Standard Interfaces (gRPC)"]
-        CRI["Container Runtime Interface (CRI)"]
-        CNI["Container Network Interface (CNI)"]
-        CSI["Container Storage Interface (CSI)"]
-    end
-    
-    subgraph Implementations["Plugins / Drivers"]
-        Runtimes["containerd / CRI-O / gVisor"]
-        Networks["Cilium (eBPF) / Calico (BGP) / Flannel"]
-        Storage["EBS CSI / Ceph RBD / vSphere CSI"]
+flowchart TD
+    subgraph Control_Plane["1. Control Plane (The Brain - Master Nodes)"]
+        API["kube-apiserver\n(The Front Desk / Gateway)"]
+        ETCD["etcd\n(The Sacred Diary / Cluster Memory)"]
+        Sched["kube-scheduler\n(The Dispatcher / HR Manager)"]
+        KCM["kube-controller-manager\n(The Watchdog / Quality Control)"]
+        CCM["cloud-controller-manager\n(Cloud Provider Interface)"]
+
+        API <-->|Stores & Reads State| ETCD
+        API <-->|Assigns Nodes| Sched
+        API <-->|Reconciliation Loops| KCM
+        API <-->|Cloud Resources| CCM
     end
 
-    Kubelet --> CRI --> Runtimes
-    Kubelet --> CNI --> Networks
-    Kubelet --> CSI --> Storage
+    subgraph Worker_Nodes["2. Worker Nodes (The Muscle - Compute Fleet)"]
+        subgraph Node1["Worker Node 1"]
+            Kubelet1["kubelet\n(The Node Foreman)"]
+            Proxy1["kube-proxy\n(The Traffic Policeman)"]
+            Runtime1["Container Runtime\n(containerd)"]
+            PodA["Pod A (Spring Boot)"]
+            PodB["Pod B (Redis)"]
+
+            Kubelet1 --> Runtime1
+            Runtime1 --> PodA
+            Runtime1 --> PodB
+            Proxy1 -.-> PodA
+        end
+
+        subgraph Node2["Worker Node 2"]
+            Kubelet2["kubelet"]
+            Proxy2["kube-proxy"]
+            Runtime2["Container Runtime"]
+            PodC["Pod C (Order API)"]
+
+            Kubelet2 --> Runtime2
+            Runtime2 --> PodC
+        end
+    end
+
+    API <==>|mTLS Commands & Heartbeats| Kubelet1
+    API <==>|mTLS Commands & Heartbeats| Kubelet2
+
+    style Control_Plane fill:#f0f9ff,stroke:#0284c7,stroke-width:2px
+    style Worker_Nodes fill:#f8fafc,stroke:#64748b,stroke-width:2px
 ```
-
-1. **CRI (Container Runtime Interface)**: Commands to create sandboxes, pull images, and start containers. The "sandbox" is typically implemented as the `pause` container, which holds the Network and IPC namespaces for all containers in the Pod.
-2. **CNI (Container Network Interface)**: Binaries executed to configure the pod's network interface. It assigns an IP address from the Pod CIDR, sets up the `veth` pair connecting the pod to the node network, and configures route rules.
-3. **CSI (Container Storage Interface)**: Automates storage provisioning (creating cloud volumes), attaching them to the correct VM (node), and mounting them into the Pod's filesystem.
-
-### 3.3 `kube-proxy`: The Network Abstraction Layer
-Implements Kubernetes `Services` (ClusterIP, NodePort) by managing node networking rules.
-- **iptables mode (Default)**: Creates a chain of DNAT (Destination NAT) rules. O(N) complexity for rule updates. Scales poorly beyond thousands of services.
-- **IPVS mode**: Uses the Linux IP Virtual Server. Hash-table based, O(1) complexity. Much faster and supports complex load-balancing algorithms (Round Robin, Least Connections).
-- **Modern eBPF Replacements**: Projects like **Cilium** completely bypass `kube-proxy` and `iptables`, writing load-balancing rules directly into the Linux kernel via eBPF for massive performance gains.
 
 ---
 
-## 4. The Anatomy of an API Request: End-to-End Flow
+## 🧠 3. Control Plane Components (Explained in Plain English)
 
-Let's trace exactly what happens when you deploy an app.
+*(Using TechWorld with Nana's "Cast of Characters" Mental Model)*
+
+### 1. `kube-apiserver` (The Front Desk / Receptionist)
+- **Role**: The central communication hub of the entire cluster.
+- Every command from `kubectl`, the dashboard, or internal components **must pass through the API Server**. No component ever talks directly to the database except the API server.
+- **Responsibilities**:
+  1. *Authentication (AuthN)*: Are you who you say you are?
+  2. *Authorization (AuthZ)*: Do your RBAC permissions allow you to create this pod?
+  3. *Admission Control*: Validates and mutates manifests (e.g. injecting sidecars).
+  4. *Persistence*: Saves the verified configuration to `etcd`.
+
+### 2. `etcd` (The Cluster's Sacred Notebook / Brain Memory)
+- **Role**: A distributed, consistent key-value store that holds the complete truth of the cluster state (every Pod, Service, Secret, and Node status).
+- **Core Rules**:
+  - Uses the **Raft Consensus Algorithm** to ensure all master nodes agree on state.
+  - Runs in odd-numbered clusters (3, 5, or 7 nodes) to avoid split-brain scenarios ($N/2 + 1$ quorum).
+  - *Golden Rule*: If `etcd` loses data, your cluster loses its memory. Regular automated snapshots of `etcd` are mandatory in production!
+
+### 3. `kube-scheduler` (The Smart HR / Dispatcher)
+- **Role**: Decides **which worker node** should run a newly created Pod.
+- **How it Works (Two-Phase Process)**:
+  1. *Filtering (Predicates)*: Eliminates nodes that don't have enough CPU/RAM, or have taints that the pod doesn't tolerate.
+  2. *Scoring (Priorities)*: Ranks surviving nodes. Prefers spreading pods across different availability zones to prevent all pods dying in one outage.
+
+### 4. `kube-controller-manager` (The Watchdog / Inspector)
+- **Role**: Continuously monitors the cluster to make sure **Actual State == Desired State**.
+- **The Reconciliation Loop**:
+  ```text
+  Loop forever:
+     1. Observe what is currently running (Actual State: 2 Pods).
+     2. Check what the user requested in YAML (Desired State: 3 Pods).
+     3. If Actual != Desired: Take corrective action (Ask API server to create 1 Pod)!
+  ```
+
+---
+
+## 🛠️ 4. Worker Node Components (The Muscle)
+
+### 1. `kubelet` (The Node Foreman / Supervisor)
+- **Role**: The agent running on every single worker node.
+- It receives Pod specifications (PodSpecs) from the API server and instructs the local container runtime (`containerd`) to download images, start containers, and mount volumes.
+- It constantly checks container health (Liveness & Readiness probes) and reports node health back to the control plane.
+
+### 2. `kube-proxy` (The Traffic Policeman / Switchboard)
+- **Role**: Runs on each worker node to handle network routing for Kubernetes **Services**.
+- When traffic is sent to a Service virtual IP (`ClusterIP`), `kube-proxy` programs the Linux kernel's `iptables` or `IPVS` rules to load-balance traffic across the healthy backend Pods.
+
+### 3. Container Runtime (`containerd` / `CRI-O`)
+- **Role**: The software that pulls container images and actually launches/stops the containers (via the **Container Runtime Interface [CRI]**).
+
+---
+
+## 🥜 5. The Pod: The Smallest Atomic Unit in Kubernetes
+
+Beginners often ask: *"Why does Kubernetes deploy Pods instead of bare Docker containers?"*
+
+### The Pea Pod Analogy
+A **Pod** is like a pea pod that holds one or more peas (containers):
+- 95% of the time, a Pod runs **one single container** (e.g. your Spring Boot web app).
+- In advanced patterns, a Pod runs a **main container + helper sidecar container**:
+  - *Main Container*: Your application serving HTTP requests.
+  - *Sidecar Container*: A logging agent (Fluentbit) or service mesh proxy (Envoy) that collects metrics.
+
+```mermaid
+flowchart TB
+    subgraph Pod["Kubernetes Pod: IP 10.244.1.45"]
+        Pause["Pause Container (Holds Network & IPC Namespace)"]
+        Main["Main Container (Spring Boot API)\nlocalhost:8080"]
+        Sidecar["Sidecar Container (Log Shipper / Envoy)\nlocalhost:9090"]
+
+        Pause --- Main
+        Pause --- Sidecar
+        Main <-->|Communicate via localhost!| Sidecar
+        Vol[("Shared Volume (/var/logs)")] --- Main
+        Vol --- Sidecar
+    end
+
+    style Pod fill:#f0fdf4,stroke:#16a34a,stroke-width:2px
+```
+
+### Why Pods are Brilliant:
+1. **Shared Network**: All containers inside the same Pod share the exact same network namespace and IP address. They can talk to each other over `localhost` at lightning speed!
+2. **Shared Storage**: Containers in a Pod can mount the exact same storage volume to share files.
+3. **Atomic Scheduling**: All containers in a Pod are always scheduled together onto the exact same physical node.
+
+---
+
+## 🔄 6. What Happens When You Run `kubectl apply -f deploy.yaml`?
+
+*(The #1 Most Frequently Asked Kubernetes Interview Question!)*
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Dev as kubectl apply -f deploy.yaml
+    actor Dev as Developer (kubectl apply)
     participant API as kube-apiserver
-    participant Webhooks as Admission Webhooks
     participant ETCD as etcd
-    participant Ctrl as kube-controller-manager
+    participant KCM as Controller Manager
     participant Sched as kube-scheduler
-    participant Kubelet as kubelet (Node)
-    participant CRI as containerd
+    participant Kubelet as kubelet (Worker Node)
+    participant CRI as containerd (Runtime)
 
-    Dev->>API: 1. POST /apis/apps/v1/namespaces/default/deployments
-    API->>API: 2. AuthN, AuthZ (RBAC)
-    API->>Webhooks: 3. Mutating/Validating Webhooks
-    API->>ETCD: 4. Persist Deployment (Rev 1)
+    Dev->>API: 1. POST Deployment manifest
+    API->>API: 2. Authenticate & Authorize (RBAC)
+    API->>ETCD: 3. Store Deployment in etcd
     
-    Ctrl-->>API: 5. Watch: DeploymentController sees new Deploy
-    Ctrl->>API: 6. POST ReplicaSet
-    API->>ETCD: 7. Persist ReplicaSet (Rev 1)
-    
-    Ctrl-->>API: 8. Watch: ReplicaSetController sees new RS
-    Ctrl->>API: 9. POST Pods (nodeName="")
-    API->>ETCD: 10. Persist Pods (Pending)
-    
-    Sched-->>API: 11. Watch: Sees Pending Pods
-    Sched->>Sched: 12. Filter (Predicates) & Score (Priorities)
-    Sched->>API: 13. POST Binding (Pod -> Node A)
-    API->>ETCD: 14. Update Pod (nodeName="Node A")
-    
-    Kubelet-->>API: 15. Watch: Sees Pod bound to itself
-    Kubelet->>CRI: 16. RunPodSandbox (Pause container)
-    Kubelet->>CRI: 17. Pull Image & Start App Container
-    Kubelet->>API: 18. PATCH Pod Status (Running)
-    API->>ETCD: 19. Persist Status
+    KCM-->>API: 4. DeploymentController sees new Deployment
+    KCM->>API: 5. Creates ReplicaSet & Pod objects (Pending, nodeName="")
+    API->>ETCD: 6. Persist Pods to etcd
+
+    Sched-->>API: 7. Scheduler notices Unscheduled Pods
+    Sched->>Sched: 8. Filters & Scores candidate Nodes
+    Sched->>API: 9. Binds Pod to Node-1 (updates nodeName)
+    API->>ETCD: 10. Persist Node assignment
+
+    Kubelet-->>API: 11. Kubelet on Node-1 sees Pod assigned to itself
+    Kubelet->>CRI: 12. Calls CRI: RunPodSandbox & Start Containers
+    CRI->>CRI: 13. Pulls image, creates namespaces, starts app
+    Kubelet->>API: 14. Reports Pod Status: Running
+    API->>ETCD: 15. Updates cluster state to Running!
 ```
 
 ---
 
-## 5. Architectural Best Practices & Hardening
-- **Control Plane HA**: Run multiple API servers behind a Layer 4 Load Balancer (e.g., HAProxy/Envoy). Keep `etcd` on dedicated, fast NVMe disks (fsync latency is critical to Raft performance).
-- **API Server Security**: Disable anonymous access. Enable audit logging. Use OIDC for user authentication instead of static tokens.
-- **Node Security**: Restrict Kubelet API access (disable anonymous auth, enable Webhook AuthZ). Use AppArmor/SELinux and Seccomp profiles for container workloads.
-- **Resource Management**: Always set `requests` and `limits` to enable the scheduler to pack nodes efficiently and to allow the Kubelet's OOM (Out of Memory) killer to make deterministic decisions during node pressure.
+## 💼 7. Interview Preparation: High-Yield Questions & Answers
+
+### Q1: "Explain Kubernetes architecture to a junior engineer."
+- **The Answer**:
+  - *"A Kubernetes cluster consists of a Control Plane (the master brain) and Worker Nodes (the workers). The Control Plane consists of the API Server (the single gateway), etcd (the consistent database storing cluster state), the Scheduler (places pods on nodes), and the Controller Manager (reconciles desired state with actual state). Worker Nodes run the Kubelet (node agent enforcing pod state), kube-proxy (networking and load-balancing), and the container runtime (containerd) that actually executes the pods."*
+
+---
+
+### Q2: "What is a Pod, and why not deploy containers directly?"
+- **The Answer**:
+  - *"A Pod is the smallest deployable execution unit in Kubernetes. It encapsulates one or more containers that share the same network namespace (IP address and port space), shared storage volumes, and IPC. Kubernetes uses Pods rather than individual containers to natively support co-located helper patterns, like sidecars (logging, proxies, security agents), allowing them to communicate via localhost while being scheduled and scaled as a single cohesive unit."*
+
+---
+
+### Q3: "Why does `etcd` require an odd number of nodes (3, 5, 7)?"
+- **The Answer**:
+  - *"`etcd` uses the Raft consensus algorithm, which requires a strict majority quorum to commit writes: $Quorum = \lfloor N/2 \rfloor + 1$.  
+  - A 3-node cluster requires 2 nodes for quorum, tolerating 1 failure.  
+  - A 4-node cluster requires 3 nodes for quorum, which STILL only tolerates 1 failure while adding network overhead and failure risk!  
+  - Therefore, running an odd number of nodes provides the maximum fault tolerance with the minimum node count."*
+
+---
+
+### Q4: "What is the difference between `kubelet` and `kube-proxy`?"
+- **The Answer**:
+  - **`kubelet`** manages the **lifecycle of Pods** on the node. It talks to the container runtime via CRI to start/stop containers and monitor their health.
+  - **`kube-proxy`** manages **networking rules** on the node. It configures `iptables` or `IPVS` so that requests to Service virtual IPs are properly routed and load-balanced to the backend Pod IPs.
+
+---
+
+### ⏱️ Rapid Recall / 30-Second Elevator Pitch
+> *"Kubernetes is a declarative container orchestration platform that continuously reconciles actual cluster state with desired state. Its Control Plane (API Server, etcd, Scheduler, Controller Manager) coordinates scheduling and self-healing, while Worker Nodes (Kubelet, Kube-proxy, Container Runtime) execute Pods, providing zero-downtime deployments, automated scaling, and unified service discovery."*
