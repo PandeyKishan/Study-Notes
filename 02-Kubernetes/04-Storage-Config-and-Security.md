@@ -45,7 +45,39 @@ flowchart TD
 
 ---
 
-## ⚡ 1. Before vs. After: Storage & Configuration
+## 📝 1. Comprehensive Study Notes: Persistent Storage, Configuration & Cluster Security
+
+### 1. Persistent Storage in Kubernetes: The CSI, PV, and PVC Pipeline
+By default, any data written inside a container lives in ephemeral storage. If the Pod is terminated or rescheduled to another worker node, that data is wiped out. For stateful systems like databases and Kafka brokers, data must survive independent of the Pod's lifecycle.
+
+**The Role of the Container Storage Interface (CSI):**
+Kubernetes does not write custom storage drivers for every cloud vendor. Instead, it defines a standard gRPC specification called the **CSI (Container Storage Interface)**. Storage vendors (AWS EBS, Google Cloud Persistent Disk, Azure Disk, Ceph) implement out-of-tree CSI plugins that handle volume creation, attachment to virtual machines, and filesystem formatting.
+
+**How Dynamic Storage Provisioning Works:**
+* **`StorageClass`:** The cluster administrator defines one or more StorageClasses (e.g., `gp3-sc` for AWS EBS gp3 SSDs). It declares which CSI provisioner to use and parameters like volume type and IOPS.
+* **`PersistentVolumeClaim` (PVC):** When a developer deploys a database, they submit a PVC requesting specific capacity (e.g., `50Gi`) and an access mode (`ReadWriteOnce`).
+* **Dynamic Provisioning:** The Kubernetes volume controller detects the PVC, calls the CSI driver, provisions the physical 50GB disk in the cloud, creates a **`PersistentVolume` (PV)** object representing that disk in the cluster, and binds the PVC to the PV. When the Pod starts, Kubernetes attaches the cloud disk to the worker node and mounts it directly into the container's designated folder (`/var/lib/postgresql/data`).
+
+### 2. Externalizing Application Configuration: ConfigMaps vs. Secrets
+Under the Twelve-Factor App methodology, code and configuration must be strictly separated. If you bake database hostnames, API endpoints, or credentials into a Docker image, changing a single configuration parameter requires rebuilding and redeploying the entire container image.
+
+**ConfigMaps (For Non-Sensitive Data):**
+A **ConfigMap** stores clear-text configuration parameters as key-value pairs (e.g., `DATABASE_URL=postgres-svc:5432` or `LOG_LEVEL=INFO`). ConfigMaps can be injected into Pods as individual environment variables, as command-line arguments, or mounted as configuration files inside a volume (e.g., mounting an `application.yml` file into `/config`). When you update a mounted ConfigMap, Kubernetes updates the file inside the container dynamically without restarting the Pod.
+
+**Secrets (For Sensitive Data):**
+A **Secret** stores confidential information such as passwords, API tokens, OAuth keys, and TLS certificates. Secrets are injected similarly to ConfigMaps (as environment variables or mounted files), but with a critical security difference: mounted Secrets are backed by the host's in-memory RAM filesystem (`tmpfs`), ensuring that sensitive credentials are never written to physical disk.
+
+*The Base64 Reality Check:* By default, Secrets stored in `etcd` are only **Base64-encoded**, which offers zero cryptographic protection. In enterprise production, clusters must enable **KMS Envelope Encryption** (where the `kube-apiserver` encrypts secrets with keys managed by AWS KMS or HashiCorp Vault before saving them to `etcd`).
+
+### 3. Securing the Cluster: Role-Based Access Control (RBAC)
+Kubernetes exposes a massive REST API. Without access control, any user or compromised container could query secrets, delete deployments, or take over the cluster. **RBAC** enforces fine-grained authorization using four core primitives:
+* **The "What" (Permissions):** A **`Role`** defines allowed actions within a specific namespace (e.g., permission to `get`, `list`, and `watch` pods in the `development` namespace). A **`ClusterRole`** defines permissions that apply cluster-wide (e.g., managing Nodes, PersistentVolumes, or reading pods across all namespaces).
+* **The "Who" (Subjects):** The entity requesting access—a human user, a developer group, or a **`ServiceAccount`** used by an automated pod or CI/CD runner.
+* **The "Glue" (Bindings):** A **`RoleBinding`** attaches a Role to a Subject within a single namespace. A **`ClusterRoleBinding`** grants cluster-wide privileges to a Subject. Following the **Principle of Least Privilege**, engineers and applications should only receive the minimum permissions necessary to perform their work.
+
+---
+
+## ⚡ 2. Before vs. After: Storage & Configuration
 
 | Feature | Before (Manual / Hardcoded) | After (Kubernetes Native) | Why This Helps (The Impact) |
 | :--- | :--- | :--- | :--- |
@@ -56,7 +88,7 @@ flowchart TD
 
 ---
 
-## 💾 2. Storage Deep Dive: Access Modes & Binding Lifecycle
+## 💾 3. Storage Deep Dive: Access Modes & Binding Lifecycle
 
 ### Storage Access Modes
 When creating a PVC, you must specify how nodes can access the disk:
@@ -78,7 +110,7 @@ When creating a PVC, you must specify how nodes can access the disk:
 
 ---
 
-## 🔑 3. ConfigMaps vs. Secrets: Managing Configuration Cleanly
+## 🔑 4. ConfigMaps vs. Secrets: Managing Configuration Cleanly
 
 ```mermaid
 flowchart LR
@@ -113,7 +145,7 @@ flowchart LR
 
 ---
 
-## 🛡️ 4. RBAC: Role-Based Access Control
+## 🛡️ 5. RBAC: Role-Based Access Control
 
 ### The Keycard Badge Analogy
 Think of building security in an office tower:
@@ -138,7 +170,7 @@ flowchart LR
 
 ---
 
-## 💼 5. Interview Preparation: High-Yield Questions & Answers
+## 💼 6. Interview Preparation: High-Yield Questions & Answers
 
 ### Q1: "Explain the difference between a PV, a PVC, and a StorageClass."
 - **The Answer**:

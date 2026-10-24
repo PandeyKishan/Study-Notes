@@ -36,7 +36,44 @@ flowchart TD
 
 ---
 
-## ⚡ 1. Before vs. After: Networking, Storage & Compose
+## 📝 1. Comprehensive Study Notes: Networking, Persistent Storage & Multi-Container Stacks
+
+### 1. Docker Networking: How Isolated Containers Communicate
+By default, Docker isolates each container inside its own private network namespace. This means a container has its own loopback interface (`127.0.0.1`), its own virtual IP address, and its own routing table. 
+
+**What Docker Networking Does:**
+When Docker starts, it creates a virtual software bridge (by default `bridge` or a custom user-defined network). When you attach containers to this network, Docker assigns each container a private virtual IP address and connects it to the virtual switch via a virtual ethernet pair (`veth`). Furthermore, on user-defined networks, Docker runs an embedded DNS server located at `127.0.0.11`. Whenever an application in `order-service` attempts to connect to `http://postgres:5432`, Docker's DNS server automatically resolves the hostname `postgres` to the database container's current private IP address.
+
+**How It Helps:**
+* **Zero Hardcoded IP Addresses:** Containers frequently restart or reschedule, changing their internal IPs. With Docker DNS, services talk to each other using stable, human-readable service names.
+* **Port Isolation:** Two different containers (e.g., two web applications) can both listen on port `8080` internally without colliding, because they live in separate network namespaces. You map each to different host ports only when external access is needed.
+* **Security & Segmentation:** You can create separate networks for frontend and backend tiers. Database containers can be placed on an internal backend network that is completely inaccessible from the outside world, drastically reducing the attack surface.
+
+### 2. Docker Storage: Surviving Container Ephemerality
+Containers are designed to be stateless, immutable, and ephemeral. When a container writes a file to its internal filesystem, that file is stored in the container's thin, read-write layer (the `UpperDir` in OverlayFS). The second that container is removed with `docker rm`, its read-write layer is permanently destroyed, and all data written inside is lost forever.
+
+**What Docker Volumes Do:**
+To persist data (such as PostgreSQL database tables, Kafka commit logs, or customer file uploads), Docker provides **Volumes**. A volume is a dedicated directory stored directly on the host machine's physical hard drive (typically under `/var/lib/docker/volumes/`) that is mounted into the container's filesystem. Reads and writes to this folder completely bypass the OverlayFS union filesystem driver, executing at native host disk speeds.
+
+**How It Helps:**
+* **Data Permanence:** When a database container crashes or is upgraded to a newer version, the container is destroyed and recreated, but the volume remains untouched on the host disk. The new container mounts the exact same volume and resumes seamlessly.
+* **Performance:** Union filesystems introduce overhead for write-heavy workloads (Copy-on-Write). Volumes write directly to the host filesystem, providing maximum I/O operations per second (IOPS).
+* **Hot-Reloading in Development (Bind Mounts):** By mounting your local project source code folder from your laptop directly into the container (`-v $(pwd)/src:/app/src`), any code changes you save in your editor immediately reflect inside the running container without rebuilding the image.
+
+### 3. Docker Compose: Orchestrating Multi-Container Applications
+In real-world architectures, an application rarely runs as a single container. A typical web platform requires a frontend web server, an API backend, a PostgreSQL database, a Redis cache, and an Apache Kafka message broker.
+
+**What Docker Compose Does:**
+Managing five separate containers using individual `docker run` commands requires manually creating networks, remembering long lists of environment variables, specifying port mappings, and running commands in the exact right order. **Docker Compose** replaces this tedious manual workflow with a single declarative configuration file (`compose.yaml` or `docker-compose.yml`). In this file, you declare all services, networks, volumes, environment variables, and healthchecks.
+
+**How It Helps:**
+* **Single-Command Control:** You can boot up the entire multi-service distributed architecture with `docker compose up -d` and shut it down cleanly with `docker compose down`.
+* **Standardized Team Environments:** The `docker-compose.yml` file is committed to version control. Every developer on the team runs the exact same stack with zero manual configuration differences.
+* **Service Dependency Management:** With features like `depends_on` and `condition: service_healthy`, Compose ensures that downstream services (like your API backend) do not start until upstream dependencies (like PostgreSQL) are fully initialized and ready to accept connections.
+
+---
+
+## ⚡ 2. Before vs. After: Networking, Storage & Compose
 
 | Feature | Before (The Manual Nightmare) | After (Docker Native Solution) | Why This Helps (The Impact) |
 | :--- | :--- | :--- | :--- |
@@ -47,7 +84,7 @@ flowchart TD
 
 ---
 
-## 🌐 2. Docker Networking: How Containers Talk
+## 🌐 3. Docker Networking: How Containers Talk
 
 ### The Apartment Intercom Analogy
 *(Popularized by TechWorld with Nana)*
@@ -91,7 +128,7 @@ flowchart TD
 
 ---
 
-## 💾 3. Docker Storage: Volumes vs. Bind Mounts
+## 💾 4. Docker Storage: Volumes vs. Bind Mounts
 
 ### The Hotel Room Safe Analogy
 Containers have an ephemeral, disposable writable layer. If you check out of a hotel room, the cleaning staff throws away everything left behind in the room. 
@@ -128,7 +165,7 @@ flowchart LR
 
 ---
 
-## 🎼 4. Docker Compose: The Conductor of Multi-Container Apps
+## 🎼 5. Docker Compose: The Conductor of Multi-Container Apps
 
 ### What is Docker Compose?
 **Docker Compose** is a tool for defining and running multi-container Docker applications using a single declarative YAML file (`compose.yaml` or `docker-compose.yml`).
@@ -211,7 +248,7 @@ networks:
 
 ---
 
-## 💼 5. Interview Preparation: High-Yield Questions & Answers
+## 💼 6. Interview Preparation: High-Yield Questions & Answers
 
 ### Q1: "Why should you NOT use the default bridge network in production?"
 - **The Answer**:
