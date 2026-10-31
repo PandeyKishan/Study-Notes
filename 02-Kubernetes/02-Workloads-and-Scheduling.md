@@ -84,7 +84,7 @@ Every container inside a Pod specification should define two critical resource t
 | :--- | :--- | :--- | :--- |
 | **Node Hardware Failure** | Pod dies permanently. Customer transactions fail until manual sysadmin intervention. | Deployment detects loss; immediately launches replacement Pod on another node. | **Automated self-healing**; achieves 99.99% service availability. |
 | **Deploying Code Updates** | Shut down old pods manually; website experiences downtime while new pods boot. | Deployment executes **RollingUpdate**: brings up Pod v2, verifies health, then drains Pod v1. | **Zero-downtime releases** with automatic rollbacks if new version fails. |
-| **Database Cluster Clustering** | Pods get random names and random IPs; master/slave replication breaks on restart. | StatefulSet assigns deterministic identities (`db-0`, `db-1`) with stable persistent storage. | Safe clustering for distributed systems (PostgreSQL, Kafka, Cassandra). |
+| **Database Clustering** | Pods get random names and random IPs; master/slave replication breaks on restart. | StatefulSet assigns deterministic identities (`db-0`, `db-1`) with stable persistent storage. | Safe clustering for distributed systems (PostgreSQL, Kafka, Cassandra). |
 
 ---
 
@@ -198,7 +198,7 @@ flowchart LR
   - *"You must use a StatefulSet when your workloads are stateful and require:  
     1. Stable, unique network identifiers (e.g. `kafka-0`, `kafka-1` via Headless Services).  
     2. Stable, persistent storage where each individual replica has its own dedicated volume that remains bound to that replica even across restarts and rescheduling.  
-    3. Ordered, graceful deployment and scaling (e.g. node 0 must start before node 1, and node 1 before node 2).*  
+    3. Ordered, graceful deployment and scaling (e.g. node 0 must start before node 1, and node 1 before node 2).  
   - Typical examples: Distributed databases, Kafka clusters, and ZooKeeper."*
 
 ---

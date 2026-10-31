@@ -160,7 +160,7 @@ flowchart LR
 | Type | How It Works | Best Use Case | Command Example |
 | :--- | :--- | :--- | :--- |
 | **Named Volume** | Docker creates and manages a folder inside `/var/lib/docker/volumes/`. High performance, completely independent of host directory structure. | **Production Databases (PostgreSQL, MySQL, MongoDB), Kafka logs.** | `docker run -v pg_data:/var/lib/postgresql/data postgres:15` |
-| **Bind Mount** | Directly mounts an exact file or folder from your computer into the container. | **Local Development**: Mount your local source code into the container so you can edit code and see hot reload without rebuilding images! | `docker run -v $(pwd)/src:/app/src node:20` |
+| **Bind Mount** | Directly mounts an exact file or folder from your computer into the container. | **Local Development**: Mount your local source code into the container so you can edit code and see hot-reloading without rebuilding images! | `docker run -v $(pwd)/src:/app/src node:20` |
 | **`tmpfs` Mount** | Stores data purely in the host machine's RAM memory. Never writes to disk. | **Sensitive tokens, passwords, private keys** that must vanish the second the container stops. | `docker run --tmpfs /tmp/secrets my-app` |
 
 ---
@@ -268,7 +268,7 @@ networks:
 ### Q3: "What is the common issue with `depends_on` in Docker Compose, and how do you solve it?"
 - **The Answer**:
   - By default, `depends_on` only checks if the container has **started**, not whether the application inside is ready to accept traffic.
-  - For example, PostgreSQL starts the container in 1 second, but takes 10 seconds to initialize schemas and open port 5432. The backend app crashes immediately because the DB is not ready!
+  - For example, the PostgreSQL container starts in 1 second, but takes 10 seconds to initialize schemas and open port 5432. The backend app crashes immediately because the DB is not ready!
   - *The Solution*: Use Docker Compose **`healthcheck`** on the database and configure `depends_on: { postgres: { condition: service_healthy } }`.
 
 ---

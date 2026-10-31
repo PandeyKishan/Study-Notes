@@ -89,7 +89,7 @@ When **`enable.idempotence=true`** is configured (the modern default since Kafka
 
 ---
 
-## 🎯 2. Partitioning Strategies & The Ordering Guarantee
+## 🎯 3. Partitioning Strategies & The Ordering Guarantee
 
 > [!IMPORTANT]
 > **The #1 Golden Rule of Kafka Ordering**:  
@@ -124,7 +124,7 @@ flowchart TD
 
 ---
 
-## 🔒 3. The "Golden Triangle" of Zero Data Loss
+## 🔒 4. The "Golden Triangle" of Zero Data Loss
 
 In distributed systems, achieving 100% data durability requires coordinating three configurations across both producer and broker:
 
@@ -149,7 +149,7 @@ flowchart TD
 
 ---
 
-## 🔁 4. Idempotent & Transactional Producers
+## 🔁 5. Idempotent & Transactional Producers
 
 ### How Idempotence Eliminates Duplicates (`enable.idempotence=true`)
 When a producer sends a batch, network drops can cause duplicate writes:
@@ -173,7 +173,7 @@ Each idempotent producer is assigned an internal **Producer ID (PID)**. Every ba
 
 ---
 
-## 💼 5. Interview Preparation: High-Yield Questions & Answers
+## 💼 6. Interview Preparation: High-Yield Questions & Answers
 
 ### Q1: "Explain the difference between `acks=0`, `acks=1`, and `acks=all`."
 - **The Answer**:

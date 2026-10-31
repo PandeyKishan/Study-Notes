@@ -51,7 +51,7 @@ flowchart TD
 | Aspect | Before (Monolithic Synchronous REST) | After (Event-Driven Cloud-Native) | Why This Helps (The Impact) |
 | :--- | :--- | :--- | :--- |
 | **System Coupling** | Order Service directly dependent on Notification Service IP. | Completely decoupled; communicating via asynchronous Kafka topic. | Deploy or upgrade notification service anytime without touching order service. |
-| **Failure Blast Radius** | Notification crash causes checkout checkout to fail for customers. | Notification crash buffers events safely in Kafka; user checkout succeeds in 5ms. | 100% resilient customer checkout experience. |
+| **Failure Blast Radius** | Notification crash causes checkout to fail for customers. | Notification crash buffers events safely in Kafka; user checkout succeeds in 5ms. | 100% resilient customer checkout experience. |
 | **Deployment Model** | Manual jar execution on individual VMs; downtime during updates. | **Docker multi-stage containers** running on **Kubernetes Deployments**. | Automated self-healing, scaling, and zero-downtime rolling updates. |
 | **Data Integrity** | Corrupted payload crashes consumer thread, freezing processing. | **`ErrorHandlingDeserializer` + Dead Letter Topic (DLT)** isolates poison pills. | Bad records are safely quarantined; healthy orders keep flowing. |
 

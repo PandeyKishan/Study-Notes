@@ -137,7 +137,7 @@ flowchart TD
 | Metric / Scenario | Before Kafka (Synchronous REST & Queues) | After Kafka (Distributed Streaming) | Why This Helps (The Impact) |
 | :--- | :--- | :--- | :--- |
 | **System Coupling** | Tight coupling; sender must know the IP/URL of every receiver. | Complete decoupling; sender only knows the Kafka topic. | Add new microservices anytime without altering producer code. |
-| **System Outages** | If downstream service crashes, upstream calls fail and user is blocked. | Events buffer safely in Kafka; downstream catches up when restored. | High fault tolerance and 100% resilient user checkouts. |
+| **System Outages** | If a downstream service crashes, upstream calls fail and the user is blocked. | Events buffer safely in Kafka; downstream catches up when restored. | High fault tolerance and 100% resilient user checkouts. |
 | **Data Replay & Auditing** | Cannot recalculate analytics if business logic had a bug. | Rewind consumer offset to `0` and re-run entire historical dataset. | Fix bugs and re-process months of historical data with zero data loss. |
 | **High Traffic Throughput** | Traditional databases and queues choke on 100k events/sec. | Scales to millions of events per second with sub-10ms latency. | Handles massive global scale (Uber ride tracks, LinkedIn feeds). |
 

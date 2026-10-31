@@ -251,7 +251,7 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
   - `ADD` can do everything `COPY` does, but additionally supports:
     1. Unpacking local compressed archives (`.tar.gz`, `.tar.bz2`) automatically into the destination.
     2. Downloading files directly from remote URLs.
-  - *Best Practice*: Best practice is to **always use `COPY`** because `ADD` can trigger unexpected behavior (e.g. unintended archive extraction) and remote URL downloads prevent proper layer caching.
+  - *Best Practice*: Always use **`COPY`** because `ADD` can trigger unexpected behavior (e.g. unintended archive extraction) and remote URL downloads prevent proper layer caching.
 
 ---
 

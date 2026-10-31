@@ -87,7 +87,7 @@ stateDiagram-v2
 
 ### Q8: What is the difference between Docker Volumes and Bind Mounts?
 - **Docker Volume**: Managed by Docker in a dedicated location on the host (`/var/lib/docker/volumes/`). Independent of host OS directory layout, immune to accidental host deletion, and optimal for database persistence.
-- **Bind Mount**: Binds an arbitrary file or folder from the host filesystem into the container (e.g. `$(pwd)/src:/app/src`). Ideal for local development hot reloading.
+- **Bind Mount**: Binds an arbitrary file or folder from the host filesystem into the container (e.g. `$(pwd)/src:/app/src`). Ideal for local development hot-reloading.
 - **`tmpfs` Mount**: Stored purely in host RAM. Wiped immediately when the container stops; ideal for sensitive in-memory credentials.
 
 ---
@@ -151,7 +151,7 @@ stateDiagram-v2
 ---
 
 ### Scenario 2: Container Starts and Immediately Exits (Exit Code 0 or 1)
-- **Symptom**: `docker ps` shows nothing, but `docker ps -a` shows container exited 2 seconds ago.
+- **Symptom**: `docker ps` shows nothing, but `docker ps -a` shows the container exited 2 seconds ago.
 - **Root Cause**: A container only runs as long as its foreground PID 1 process is alive. If the command daemonizes into the background (e.g. `nginx` running as a background daemon) or finishes immediately, the container exits.
 - **Triage & Fix**:
   ```bash

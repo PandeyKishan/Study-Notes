@@ -137,8 +137,8 @@ timeline
 
 Before heading into cloud engineering, DevOps, or distributed backend system interviews, ensure you can answer:
 - [ ] *Can you explain the exact difference between a process, a container, and a virtual machine?* $\to$ [Answer](./01-Docker/04-Interview-Questions-and-Troubleshooting.md#q1-what-is-docker-and-why-is-it-used-over-traditional-virtual-machines)
-- [ ] *What happens under the hood when a pod gets scheduled from `kubectl apply -f` to running on a node?* $\to$ [Answer](./02-Kubernetes/01-Architecture-and-Control-Plane.md#-6-what-happens-when-you-run-kubectl-apply--f-deployyaml)
-- [ ] *Why does Kafka achieve orders of magnitude higher throughput than traditional message brokers like RabbitMQ?* $\to$ [Answer](./03-Apache-Kafka/01-Architecture-and-Log-Internals.md#-3-why-is-kafka-insanely-fast-the-3-engineering-secrets)
-- [ ] *How do you achieve Zero Data Loss in an Apache Kafka pipeline?* $\to$ [Answer](./03-Apache-Kafka/02-Producer-Internals-and-Delivery-Semantics.md#-3-the-golden-triangle-of-zero-data-loss)
-- [ ] *How do you design a zero-downtime deployment pipeline with automated canary rollbacks?* $\to$ [Answer](./04-CICD-Pipelines/04-Deployment-Strategies.md#-4-interview-preparation-high-yield-questions--answers)
-- [ ] *How do you isolate poison pill messages in Spring Boot Kafka without freezing partition consumption?* $\to$ [Answer](./03-Apache-Kafka/07-Spring-Boot-Kafka-Integration-and-Patterns.md#-2-the-poison-pill-trap--errorhandlingdeserializer)
+- [ ] *What happens under the hood when a pod gets scheduled from `kubectl apply -f` to running on a node?* $\to$ [Answer](./02-Kubernetes/01-Architecture-and-Control-Plane.md#-7-what-happens-when-you-run-kubectl-apply--f-deployyaml)
+- [ ] *Why does Kafka achieve orders of magnitude higher throughput than traditional message brokers like RabbitMQ?* $\to$ [Answer](./03-Apache-Kafka/01-Architecture-and-Log-Internals.md#-4-why-is-kafka-insanely-fast-the-3-engineering-secrets)
+- [ ] *How do you achieve Zero Data Loss in an Apache Kafka pipeline?* $\to$ [Answer](./03-Apache-Kafka/02-Producer-Internals-and-Delivery-Semantics.md#-4-the-golden-triangle-of-zero-data-loss)
+- [ ] *How do you design a zero-downtime deployment pipeline with automated canary rollbacks?* $\to$ [Answer](./04-CICD-Pipelines/04-Deployment-Strategies.md#-5-interview-preparation-high-yield-questions--answers)
+- [ ] *How do you isolate poison pill messages in Spring Boot Kafka without freezing partition consumption?* $\to$ [Answer](./03-Apache-Kafka/07-Spring-Boot-Kafka-Integration-and-Patterns.md#2-the-poison-pill-trap--errorhandlingdeserializer)
