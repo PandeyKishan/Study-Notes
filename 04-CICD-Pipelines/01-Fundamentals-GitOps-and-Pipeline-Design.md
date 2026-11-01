@@ -21,9 +21,9 @@ flowchart LR
     Dev["Developer Laptop\nWorks for 3 months"] -->|Manual FTP / SSH at 11 PM| Server["Production Server\n💥 Crashes! Missing libraries!"]
     Server -->|12 Hours Downtime| Panic["Emergency Weekend War Room\n'It worked on my machine!'"]
 
-    style Dev fill:#ecfdf5,stroke:#10b981,stroke-width:2px
-    style Server fill:#fee2e2,stroke:#ef4444,stroke-width:2px
-    style Panic fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+    style Dev fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style Server fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    style Panic fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
 ```
 
 ---
@@ -49,12 +49,12 @@ flowchart LR
     Build --> Stage["4. Verification Gate\nDeploy to Staging"]
     Stage --> Prod["5. Release Gate\nDeploy to Production"]
 
-    style Commit fill:#f3f4f6,stroke:#4b5563,stroke-width:2px
-    style Lint fill:#eff6ff,stroke:#2563eb,stroke-width:2px
-    style Sec fill:#fef3c7,stroke:#d97706,stroke-width:2px
-    style Build fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px
-    style Stage fill:#e0e7ff,stroke:#4338ca,stroke-width:2px
-    style Prod fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+    style Commit fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style Lint fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style Sec fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style Build fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style Stage fill:#c4b5fd,stroke:#6d28d9,stroke-width:2px,color:#0f172a
+    style Prod fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
 ```
 
 ---
@@ -65,19 +65,19 @@ flowchart LR
 Modern cloud-native engineering relies on automated delivery pipelines and declarative operations to ship software safely and reliably:
 
 1. **Continuous Integration (CI)**:
-   * **Definition**: Continuous Integration is an engineering discipline where software developers frequently merge code changes into a shared central repository (typically multiple times per day).
+   * *Book Definition*: Continuous Integration (CI) is a software development practice where developers regularly merge code changes into a central repository, triggering automated builds and tests to rapidly identify defects.
    * **Core Purpose**: Each merge triggers an automated pipeline that compiles the code, executes automated linters and unit tests, and validates that the new code integrates cleanly without breaking existing functionality. CI eliminates the dreaded "integration hell" where multiple teams attempt to merge diverging feature branches after months of isolated work.
 
 2. **Continuous Delivery (CD)**:
-   * **Definition**: An automated delivery practice where code that successfully passes all CI stages is automatically packaged, tested against integration environments, and prepared for deployment to production.
+   * *Book Definition*: Continuous Delivery is a software engineering approach in which teams produce software in short cycles, ensuring that the software can be reliably released to production at any time through automated quality gates subject to manual deployment authorization.
    * **The Defining Attribute**: In Continuous Delivery, **every build is inherently release-ready**, but the actual deployment to the production environment requires a deliberate human business decision (such as an authorized release manager clicking an "Approve Release" button in a portal).
 
 3. **Continuous Deployment (CD)**:
-   * **Definition**: The complete, end-to-end automation of the software release lifecycle.
+   * *Book Definition*: Continuous Deployment is an automated software delivery process in which every code change that passes all stages of the production pipeline is released directly into live production without human intervention.
    * **The Defining Attribute**: There is **zero human intervention** between a developer committing verified code and that code running in live production. If all automated quality gates, security scans, integration tests, and staging smoke tests pass, the pipeline deploys the change directly to production users automatically.
 
 4. **GitOps**:
-   * **Definition**: An operational paradigm for cloud-native applications (popularized by Weaveworks and formalized by OpenGitOps) where **Git repositories act as the single source of truth** for declarative infrastructure and application manifests.
+   * *Book Definition*: GitOps is an operating model for cloud-native applications that uses Git version control as the single source of truth for declarative infrastructure and application configurations, enforced via continuous automated reconciliation.
    * **Core Principle**: Rather than having engineers or CI runners run manual `kubectl apply` commands against live clusters, the desired state of the cluster is committed declaratively to a Git repository. Specialized in-cluster controllers (such as ArgoCD or Flux) continuously reconcile the live cluster state with the configuration in Git.
 
 ---
@@ -156,9 +156,17 @@ flowchart TD
         F -.->|Fully Automated (No Human Gate)| H
     end
 
-    style CI fill:#eff6ff,stroke:#2563eb,stroke-width:2px
-    style CD_Deliv fill:#fef3c7,stroke:#d97706,stroke-width:2px
-    style CD_Deploy fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+    style CI fill:#f1f5f9,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style CD_Deliv fill:#f1f5f9,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style CD_Deploy fill:#f1f5f9,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style A fill:#e2e8f0,stroke:#334155,stroke-width:1.5px,color:#0f172a
+    style B fill:#93c5fd,stroke:#1d4ed8,stroke-width:1.5px,color:#0f172a
+    style C fill:#93c5fd,stroke:#1d4ed8,stroke-width:1.5px,color:#0f172a
+    style D fill:#93c5fd,stroke:#1d4ed8,stroke-width:1.5px,color:#0f172a
+    style E fill:#fde047,stroke:#b45309,stroke-width:1.5px,color:#0f172a
+    style F fill:#fde047,stroke:#b45309,stroke-width:1.5px,color:#0f172a
+    style G fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    style H fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
 ```
 
 ### The Bakery Analogy:
@@ -189,9 +197,15 @@ flowchart TD
         API2 --> Cluster2["Production Cluster"]
     end
 
-    style Push_Model fill:#fef2f2,stroke:#ef4444,stroke-width:1px
-    style Pull_Model fill:#ecfdf5,stroke:#10b981,stroke-width:2px
-    style Argo fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+    style Push_Model fill:#f1f5f9,stroke:#dc2626,stroke-width:1.5px,color:#0f172a
+    style Pull_Model fill:#f1f5f9,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style GHA fill:#fca5a5,stroke:#dc2626,stroke-width:1.5px,color:#7f1d1d
+    style API1 fill:#e2e8f0,stroke:#334155,stroke-width:1.5px,color:#0f172a
+    style Cluster1 fill:#e2e8f0,stroke:#334155,stroke-width:1.5px,color:#0f172a
+    style GitRepo fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style Argo fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style API2 fill:#e2e8f0,stroke:#334155,stroke-width:1.5px,color:#0f172a
+    style Cluster2 fill:#e2e8f0,stroke:#334155,stroke-width:1.5px,color:#0f172a
 ```
 
 ### Why Pull-Based GitOps is the Gold Standard:
@@ -202,6 +216,9 @@ flowchart TD
 ---
 
 ## 📈 5. The 4 DORA Metrics (What Elite Engineering Teams Measure)
+
+> **Book Definition**:
+> *DORA Metrics*: Four foundational DevOps benchmarks (Deployment Frequency, Lead Time for Changes, Change Failure Rate, and Time to Restore Service) established by Google's DevOps Research and Assessment team to measure software delivery velocity and stability.
 
 Google's DevOps Research and Assessment (DORA) identifies four metrics that distinguish top-performing engineering organizations:
 

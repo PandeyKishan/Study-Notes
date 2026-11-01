@@ -24,15 +24,21 @@ flowchart TD
     CheckCPU -->|Consumer CPU / Memory Bottleneck| ScaleConsumers["📈 Scale Consumers\nAction: Scale consumer instances up to total partition count. Increase batch.size & poll interval. Profile for GC pauses."]
     CheckCPU -->|Downstream DB / API Bottleneck| DBHang["⏳ External Dependency Slowdown\nDatabase writes, locks, or 3rd-party REST API throttling.\n\nAction: Introduce batch DB inserts, bulk API writes, or circuit breakers."]
 
-    style Spike fill:#fee2e2,stroke:#ef4444,stroke-width:2px,color:#991b1b
-    style HotKey fill:#fef3c7,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    style ScaleConsumers fill:#dcfce7,stroke:#22c55e,stroke-width:2px,color:#166534
-    style DBHang fill:#eff6ff,stroke:#3b82f6,stroke-width:2px,color:#1e40af
+    style Spike fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    style Step1 fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style HotKey fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style CheckCPU fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style ScaleConsumers fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style DBHang fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
 ```
 
 ---
 
 ## 2. The Poison Pill & Dead Letter Queue (DLQ) Architecture
+
+> **Book Definitions**:
+> - *Poison Pill*: A corrupt, unparseable, or schema-violating message that consistently causes consumer deserialization or handler logic to fail, halting partition progression.
+> - *Dead Letter Queue (DLQ)*: A dedicated secondary Kafka topic used to isolate unprocessable or malformed event records for offline triage and auditing without blocking main processing pipelines.
 
 A **poison pill** is a corrupted, unparseable, or business-logic-violating message payload that causes the consumer application to throw an unhandled exception during processing. If the consumer fails to commit the offset and retries continuously, the entire partition halts, leading to catastrophic lag.
 

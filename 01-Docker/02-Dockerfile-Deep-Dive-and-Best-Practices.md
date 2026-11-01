@@ -22,9 +22,9 @@ flowchart TD
     Recipe["Dockerfile (Text Recipe)"] -->|docker build -t my-app:1.0 .| Image["Docker Image (Frozen Cake in Box)"]
     Image -->|docker run -p 8080:8080 my-app:1.0| Container["Running Container (App Serving Traffic)"]
 
-    style Recipe fill:#f3f4f6,stroke:#4b5563,stroke-width:2px
-    style Image fill:#dbeafe,stroke:#2563eb,stroke-width:2px
-    style Container fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+    style Recipe fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style Image fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style Container fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
 ```
 
 ---
@@ -67,27 +67,31 @@ Many beginners write naive Dockerfiles that result in bloated, insecure, and slu
 Here are the essential instructions every developer and DevOps engineer must know:
 
 ### 1. `FROM` (The Starting Foundation)
+- *Book Definition*: Sets the base parent image upon which all subsequent instructions in the Dockerfile will build.
 - Every Dockerfile starts with `FROM`. It defines your base image.
 - *Beginner Tip*: Avoid using heavy OS images like `FROM ubuntu:latest` (80MB+) for simple apps. Prefer specialized slim images like `python:3.11-slim` or `node:20-alpine` (5MB).
 
 ### 2. `WORKDIR` (The Working Directory)
+- *Book Definition*: Establishes the current working directory for any subsequent `RUN`, `CMD`, `ENTRYPOINT`, `COPY`, and `ADD` instructions.
 - Sets the working directory inside the container for all following instructions.
 - *Best Practice*: Always use `WORKDIR /app` instead of running `RUN cd /app`. `WORKDIR` will automatically create the folder if it does not exist.
 
 ### 3. `COPY` vs. `ADD` (The File Transfer)
-- **`COPY <src> <dest>`**: Copies files from your local computer into the container filesystem. Simple, safe, and transparent.
-- **`ADD <src> <dest>`**: Does what `COPY` does, PLUS two magic features: it can auto-extract local `.tar.gz` archives, and download files from remote URLs.
+- **`COPY <src> <dest>`**: *Book Definition: Copies new files or directories from the local build context into the container filesystem at the specified destination path.* Simple, safe, and transparent.
+- **`ADD <src> <dest>`**: *Book Definition: Copies files, directories, or remote URLs to the destination path, automatically decompressing recognized archive formats into directory trees.* Does what `COPY` does, PLUS two magic features: it can auto-extract local `.tar.gz` archives, and download files from remote URLs.
 - *Best Practice*: **99% of the time, use `COPY`**. Only use `ADD` when you explicitly need to unpack a local `.tar` file into the container.
 
 ### 4. `RUN` (Build-Time Execution)
+- *Book Definition*: Executes commands inside a new intermediate container layer during image build time and commits the resulting filesystem snapshot as a new image layer.
 - Runs commands **during the build phase** to install packages and create files. Each `RUN` creates a permanent new read-only image layer.
 - *Example*: `RUN npm install` or `RUN apt-get update && apt-get install -y curl`.
 
 ### 5. `ENV` vs. `ARG` (Variables Explained)
-- **`ARG` (Build-Time Only)**: Available *only* while the image is being built with `docker build --build-arg VERSION=1.2`. Once the image is built, the ARG vanishes.
-- **`ENV` (Runtime Environment Variable)**: Persists inside the image and is available to the running container process (`process.env.DB_HOST`).
+- **`ARG` (Build-Time Only)**: *Book Definition: Declares a parameter variable that users can pass at build-time to Docker using the `docker build --build-arg` flag.* Available *only* while the image is being built. Once the image is built, the ARG vanishes.
+- **`ENV` (Runtime Environment Variable)**: *Book Definition: Sets key-value environment variables that persist in the image and remain accessible to all container runtime processes.* Persists inside the image and is available to the running container process (`process.env.DB_HOST`).
 
 ### 6. `EXPOSE` (Documentation Port)
+- *Book Definition*: Documents the specific network ports and protocols on which the containerized service expects incoming traffic at runtime.
 - Documents which port the container listens on (e.g., `EXPOSE 8080`).
 - *Important Beginner Note*: `EXPOSE` does **not** publish the port to your host machine! It is purely metadata documentation. You still must use `-p 8080:8080` when running `docker run`.
 
@@ -95,6 +99,9 @@ Here are the essential instructions every developer and DevOps engineer must kno
 
 ### 7. The Classic Interview Favorite: `CMD` vs. `ENTRYPOINT`
 *(TechWorld with Nana's Cafe Order Analogy)*
+
+- **`ENTRYPOINT`**: *Book Definition: Configures the container to run as a fixed executable with specified default commands that are not overridden by CLI arguments.*
+- **`CMD`**: *Book Definition: Sets the default parameters or executable command for a running container, which are completely superseded by command-line arguments passed to `docker run`.*
 
 Imagine ordering coffee at a cafe:
 - **`ENTRYPOINT`** is the fixed, permanent base item: **"Coffee"**.
@@ -147,12 +154,13 @@ flowchart TD
         L5 --> L6["Step 6: CMD ['node', 'server.js']\n(Metadata -> INSTANT)"]
     end
 
-    style L1 fill:#dcfce7,stroke:#16a34a,stroke-width:1px
-    style L2 fill:#dcfce7,stroke:#16a34a,stroke-width:1px
-    style L3 fill:#dcfce7,stroke:#16a34a,stroke-width:1px
-    style L4 fill:#dcfce7,stroke:#16a34a,stroke-width:2px
-    style L5 fill:#fee2e2,stroke:#ef4444,stroke-width:2px
-    style L6 fill:#dcfce7,stroke:#16a34a,stroke-width:1px
+    style Layer_Rules fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style L1 fill:#bbf7d0,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style L2 fill:#bbf7d0,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style L3 fill:#bbf7d0,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style L4 fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style L5 fill:#fecaca,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    style L6 fill:#bbf7d0,stroke:#15803d,stroke-width:2px,color:#0f172a
 ```
 
 ### The Cardinal Rule:
@@ -163,6 +171,8 @@ If you put `COPY . .` *before* `RUN npm install`, every single time you change o
 ---
 
 ## 🍽️ 5. Multi-Stage Builds: The "Kitchen vs. Dining Room" Analogy
+
+*Book Definition*: **Multi-Stage Builds** are a Dockerfile design pattern featuring multiple `FROM` instructions where selective artifacts can be copied from intermediate compilation environments into a pristine, minimal production runtime image.
 
 When dining at a high-end restaurant:
 - **The Kitchen (Builder Stage)**: Has raw meat, flour bags, cleavers, vegetable peelers, and giant blenders.
@@ -184,8 +194,8 @@ flowchart LR
 
     S1 -->|Copy only the compiled binary (15MB)| S2
 
-    style Stage1 fill:#fef3c7,stroke:#d97706,stroke-width:2px
-    style Stage2 fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+    style Stage1 fill:#fde68a,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style Stage2 fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
 ```
 
 ### Production Example: Multi-Stage Java / Spring Boot Dockerfile

@@ -38,10 +38,14 @@ flowchart TD
         Worker -->|4. Simulated Business Action| Action["Dispatches Customer Email & SMS"]
     end
 
-    style K8s_Cluster fill:#f8fafc,stroke:#0284c7,stroke-width:2px
-    style API fill:#ecfdf5,stroke:#10b981,stroke-width:2px
-    style KafkaBroker fill:#fffbeb,stroke:#f59e0b,stroke-width:2px
-    style Worker fill:#eff6ff,stroke:#3b82f6,stroke-width:2px
+    style K8s_Cluster fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style Client fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style Ingress fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style SvcOrder fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style API fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style KafkaBroker fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style Worker fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style Action fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
 ```
 
 ---

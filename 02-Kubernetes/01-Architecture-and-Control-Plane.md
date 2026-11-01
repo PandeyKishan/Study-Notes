@@ -56,8 +56,16 @@ flowchart TD
         K8s -->|Schedules & Heals| Node3
     end
 
-    style Conductor fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px
-    style K8s fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+    style Conductor fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style Violin fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style Drums fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style Piano fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style K8s fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style Node1 fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style Node2 fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style Node3 fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style Analogy fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style Production fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
 ```
 
 > **The Golden Definition**:  
@@ -103,6 +111,10 @@ Engineering organizations adopt Kubernetes because managing modern distributed s
 ---
 
 ## 🏛️ 3. The Complete Cluster Architecture: Control Plane & Worker Nodes
+
+> **Book Definitions**:
+> - *Control Plane*: The centralized management layer of Kubernetes comprising master components that maintain cluster state, make global scheduling decisions, and execute continuous reconciliation loops.
+> - *Worker Node*: A physical or virtual computing machine in the cluster fleet that provides the compute capacity to run user application pods under the direction of the control plane.
 
 A Kubernetes cluster is divided into two distinct planes:
 1. **The Control Plane (The Brains / Management)**: Decides what runs where.
@@ -151,8 +163,24 @@ flowchart TD
     API <==>|mTLS Commands & Heartbeats| Kubelet1
     API <==>|mTLS Commands & Heartbeats| Kubelet2
 
-    style Control_Plane fill:#f0f9ff,stroke:#0284c7,stroke-width:2px
-    style Worker_Nodes fill:#f8fafc,stroke:#64748b,stroke-width:2px
+    style Control_Plane fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#0f172a
+    style Worker_Nodes fill:#f1f5f9,stroke:#475569,stroke-width:2px,color:#0f172a
+    style Node1 fill:#ffffff,stroke:#64748b,stroke-width:1.5px,color:#0f172a
+    style Node2 fill:#ffffff,stroke:#64748b,stroke-width:1.5px,color:#0f172a
+    style API fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style ETCD fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style Sched fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style KCM fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    style CCM fill:#cbd5e1,stroke:#475569,stroke-width:2px,color:#0f172a
+    style Kubelet1 fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style Kubelet2 fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style Proxy1 fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style Proxy2 fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style Runtime1 fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style Runtime2 fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style PodA fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style PodB fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style PodC fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
 ```
 
 ---
@@ -162,6 +190,7 @@ flowchart TD
 *(Using TechWorld with Nana's "Cast of Characters" Mental Model)*
 
 ### 1. `kube-apiserver` (The Front Desk / Receptionist)
+> **Book Definition**: The kube-apiserver is the core control plane component that exposes the Kubernetes API and serves as the sole entry point for all administrative queries, REST operations, and cluster communications.
 - **Role**: The central communication hub of the entire cluster.
 - Every command from `kubectl`, the dashboard, or internal components **must pass through the API Server**. No component ever talks directly to the database except the API server.
 - **Responsibilities**:
@@ -171,6 +200,7 @@ flowchart TD
   4. *Persistence*: Saves the verified configuration to `etcd`.
 
 ### 2. `etcd` (The Cluster's Sacred Notebook / Brain Memory)
+> **Book Definition**: etcd is a consistent, highly available, distributed key-value store used as Kubernetes' backing store for all cluster data and authoritative state.
 - **Role**: A distributed, consistent key-value store that holds the complete truth of the cluster state (every Pod, Service, Secret, and Node status).
 - **Core Rules**:
   - Uses the **Raft Consensus Algorithm** to ensure all master nodes agree on state.
@@ -178,12 +208,14 @@ flowchart TD
   - *Golden Rule*: If `etcd` loses data, your cluster loses its memory. Regular automated snapshots of `etcd` are mandatory in production!
 
 ### 3. `kube-scheduler` (The Smart HR / Dispatcher)
+> **Book Definition**: The kube-scheduler is a control plane process that monitors newly created pods with no assigned node and selects the optimal worker node for them to run on based on resource requirements and policy constraints.
 - **Role**: Decides **which worker node** should run a newly created Pod.
 - **How it Works (Two-Phase Process)**:
   1. *Filtering (Predicates)*: Eliminates nodes that don't have enough CPU/RAM, or have taints that the pod doesn't tolerate.
   2. *Scoring (Priorities)*: Ranks surviving nodes. Prefers spreading pods across different availability zones to prevent all pods dying in one outage.
 
 ### 4. `kube-controller-manager` (The Watchdog / Inspector)
+> **Book Definition**: The kube-controller-manager is a control plane daemon that embeds core control loops which continuously compare the shared state of the cluster through the API server and make changes attempting to move the current state toward the desired state.
 - **Role**: Continuously monitors the cluster to make sure **Actual State == Desired State**.
 - **The Reconciliation Loop**:
   ```text
@@ -198,20 +230,25 @@ flowchart TD
 ## 🛠️ 5. Worker Node Components (The Muscle)
 
 ### 1. `kubelet` (The Node Foreman / Supervisor)
+> **Book Definition**: The kubelet is an agent that runs on each node in the cluster to ensure that the containers described in PodSpecs are running and healthy.
 - **Role**: The agent running on every single worker node.
 - It receives Pod specifications (PodSpecs) from the API server and instructs the local container runtime (`containerd`) to download images, start containers, and mount volumes.
 - It constantly checks container health (Liveness & Readiness probes) and reports node health back to the control plane.
 
 ### 2. `kube-proxy` (The Traffic Policeman / Switchboard)
+> **Book Definition**: kube-proxy is a network proxy that runs on each node in the cluster, maintaining network routing rules on host IP tables or IPVS to allow network communication to pods from network sessions inside or outside of the cluster.
 - **Role**: Runs on each worker node to handle network routing for Kubernetes **Services**.
 - When traffic is sent to a Service virtual IP (`ClusterIP`), `kube-proxy` programs the Linux kernel's `iptables` or `IPVS` rules to load-balance traffic across the healthy backend Pods.
 
 ### 3. Container Runtime (`containerd` / `CRI-O`)
+> **Book Definition**: The container runtime is the fundamental node-level software component responsible for pulling container images, configuring isolated namespaces, and running containers via the Container Runtime Interface (CRI).
 - **Role**: The software that pulls container images and actually launches/stops the containers (via the **Container Runtime Interface [CRI]**).
 
 ---
 
 ## 🥜 6. The Pod: The Smallest Atomic Unit in Kubernetes
+
+> **Book Definition**: A Pod is the smallest and simplest atomic unit in the Kubernetes object model that represents a single instance of a running process in a cluster, encapsulating one or more tightly coupled containers with shared storage and network resources.
 
 Beginners often ask: *"Why does Kubernetes deploy Pods instead of bare Docker containers?"*
 
@@ -225,18 +262,22 @@ A **Pod** is like a pea pod that holds one or more peas (containers):
 ```mermaid
 flowchart TB
     subgraph Pod["Kubernetes Pod: IP 10.244.1.45"]
-        Pause["Pause Container (Holds Network & IPC Namespace)"]
+        Pause["Pause Container\n(Holds Network & IPC Namespace)"]
         Main["Main Container (Spring Boot API)\nlocalhost:8080"]
         Sidecar["Sidecar Container (Log Shipper / Envoy)\nlocalhost:9090"]
 
         Pause --- Main
         Pause --- Sidecar
         Main <-->|Communicate via localhost!| Sidecar
-        Vol[("Shared Volume (/var/logs)")] --- Main
+        Vol[("Shared Volume\n(/var/logs)")] --- Main
         Vol --- Sidecar
     end
 
-    style Pod fill:#f0fdf4,stroke:#16a34a,stroke-width:2px
+    style Pod fill:#f0fdf4,stroke:#16a34a,stroke-width:2px,color:#0f172a
+    style Pause fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style Main fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style Sidecar fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style Vol fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
 ```
 
 ### Why Pods are Brilliant:

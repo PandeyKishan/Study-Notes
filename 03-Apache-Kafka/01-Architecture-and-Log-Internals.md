@@ -28,7 +28,13 @@ flowchart TD
         Inv -.->|HTTP REST| Analytics
     end
 
-    style Spaghetti fill:#fef2f2,stroke:#ef4444,stroke-width:2px
+    style Spaghetti fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style Order fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style Pay fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    style Inv fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    style Notif fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    style Fraud fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    style Analytics fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
 ```
 
 ### What Happens in Production?
@@ -57,8 +63,13 @@ flowchart LR
         KafkaTopic -->|Consumes| Analytics["Analytics Pipeline"]
     end
 
-    style Event_Driven fill:#ecfdf5,stroke:#10b981,stroke-width:2px
-    style KafkaTopic fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px
+    style Event_Driven fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style Order fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style KafkaTopic fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style Pay fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style Inv fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style Notif fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style Analytics fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
 ```
 
 ---
@@ -102,13 +113,27 @@ Modern distributed systems adopt Kafka because synchronous point-to-point commun
 
 ## 📖 2. Core Vocabulary (Plain-English Definitions)
 
-- **Event / Record**: A piece of data recording something that happened (Key, Value, Timestamp, Headers).
-- **Producer**: The application that creates and sends events to Kafka.
-- **Consumer**: The application that reads and processes events from Kafka.
-- **Broker**: A single Kafka server. A Kafka cluster is a group of brokers working together.
-- **Topic**: A named channel or category where records are published (e.g., `orders`, `user-signups`).
-- **Partition**: Topics are split into **Partitions** (shards) for horizontal scalability and parallel processing.
-- **Offset**: A unique sequential integer assigned to each record within a partition. It acts as a **bookmark** indicating which message a consumer has read up to.
+- **Event / Record**:
+  - *Book Definition*: An event (or record) is an immutable unit of data in Kafka consisting of a timestamp, optional key, payload value, and optional metadata headers.
+  - A piece of data recording something that happened in the business domain.
+- **Producer**:
+  - *Book Definition*: A producer is a client application that publishes (writes) streams of event records into Kafka topics.
+  - The application that creates and sends events to Kafka.
+- **Consumer**:
+  - *Book Definition*: A consumer is a client application that subscribes to one or more Kafka topics to read and process published event records.
+  - The application that reads and processes events from Kafka.
+- **Broker**:
+  - *Book Definition*: A broker is a standalone Kafka server node that receives, stores, serves, and replicates event logs within a cluster.
+  - A single Kafka server. A Kafka cluster is a group of brokers working together.
+- **Topic**:
+  - *Book Definition*: A topic is a logical channel or category to which event records are published and from which consumers read.
+  - A named channel or category where records are published (e.g., `orders`, `user-signups`).
+- **Partition**:
+  - *Book Definition*: A partition is an ordered, immutable, append-only commit log sequence that acts as the basic unit of parallelism and storage distribution for a Kafka topic.
+  - Topics are split into **Partitions** (shards) for horizontal scalability and parallel processing.
+- **Offset**:
+  - *Book Definition*: An offset is a monotonically increasing 64-bit integer assigned to every message within a partition that uniquely identifies its sequential position in the commit log.
+  - A unique sequential integer assigned to each record within a partition. It acts as a **bookmark** indicating which message a consumer has read up to.
 
 ```mermaid
 flowchart TD
@@ -124,10 +149,22 @@ flowchart TD
         end
     end
 
-    style Topic fill:#f8fafc,stroke:#64748b,stroke-width:2px
-    style P0 fill:#eff6ff,stroke:#3b82f6,stroke-width:1px
-    style P1 fill:#eff6ff,stroke:#3b82f6,stroke-width:1px
-    style P2 fill:#eff6ff,stroke:#3b82f6,stroke-width:1px
+    style Topic fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style P0 fill:#ffffff,stroke:#1d4ed8,stroke-width:1.5px,color:#0f172a
+    style P1 fill:#ffffff,stroke:#1d4ed8,stroke-width:1.5px,color:#0f172a
+    style P2 fill:#ffffff,stroke:#1d4ed8,stroke-width:1.5px,color:#0f172a
+    style O0 fill:#93c5fd,stroke:#1d4ed8,stroke-width:1px,color:#0f172a
+    style O1 fill:#93c5fd,stroke:#1d4ed8,stroke-width:1px,color:#0f172a
+    style O2 fill:#93c5fd,stroke:#1d4ed8,stroke-width:1px,color:#0f172a
+    style O3 fill:#93c5fd,stroke:#1d4ed8,stroke-width:1px,color:#0f172a
+    style O4 fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style P0_O0 fill:#93c5fd,stroke:#1d4ed8,stroke-width:1px,color:#0f172a
+    style P0_O1 fill:#93c5fd,stroke:#1d4ed8,stroke-width:1px,color:#0f172a
+    style P0_O2 fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style P2_O0 fill:#93c5fd,stroke:#1d4ed8,stroke-width:1px,color:#0f172a
+    style P2_O1 fill:#93c5fd,stroke:#1d4ed8,stroke-width:1px,color:#0f172a
+    style P2_O2 fill:#93c5fd,stroke:#1d4ed8,stroke-width:1px,color:#0f172a
+    style P2_O3 fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
 ```
 
 ---
@@ -178,6 +215,9 @@ sequenceDiagram
 
 By using the Linux `sendfile()` system call, Kafka bypasses user space entirely. Data moves directly from the OS Page Cache to the Network Card, reducing CPU load to near zero!
 
+> **Book Definition**:
+> *Zero-Copy*: A Linux kernel data-transfer optimization utilizing the `sendfile()` system call that transfers data directly from OS page cache memory buffers to the network interface card without performing redundant CPU copies into application user space.
+
 ---
 
 ## 🛡️ 5. Replication, High Watermark & Fault Tolerance
@@ -197,15 +237,19 @@ flowchart TD
         Leader -.->|Replication Fetch| F2
     end
 
-    style Leader fill:#dcfce7,stroke:#16a34a,stroke-width:2px
-    style F1 fill:#eff6ff,stroke:#2563eb,stroke-width:1px
-    style F2 fill:#fee2e2,stroke:#ef4444,stroke-width:1px
+    style Topic_Partition_0 fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style Leader fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style F1 fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style F2 fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
 ```
 
 ### The Three Critical Acronyms:
-1. **LEO (Log End Offset)**: The offset of the next message to be written.
-2. **ISR (In-Sync Replicas)**: The set of broker replicas that are caught up with the leader.
-3. **HW (High Watermark)**: The highest offset that has been replicated to **all members of the ISR**.
+1. **LEO (Log End Offset)**:
+   - *Book Definition*: Log End Offset (LEO) is the offset of the next record to be written into a partition log on a specific broker replica.
+2. **ISR (In-Sync Replicas)**:
+   - *Book Definition*: In-Sync Replicas (ISR) is the dynamic subset of partition replicas that are actively caught up with the partition leader within the configured replica lag time threshold (`replica.lag.time.max.ms`).
+3. **HW (High Watermark)**:
+   - *Book Definition*: The High Watermark (HW) is the highest offset in a partition that has been successfully replicated across all members of the ISR, establishing the boundary of messages visible to consumers.
    > **The Visibility Guarantee**: Consumers can **only read up to the High Watermark**. Uncommitted messages past the HW are invisible to consumers. If the leader broker dies, the new leader is guaranteed to have all committed messages!
 
 ---

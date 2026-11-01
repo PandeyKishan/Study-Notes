@@ -19,9 +19,10 @@ flowchart LR
     Front -.->|Connection Refused! ❌| Dead[Dead Connection]
     NewBack["New Backend Pod Created\n(Assigned NEW IP: 10.244.2.88)"]
 
-    style Front fill:#eff6ff,stroke:#2563eb,stroke-width:2px
-    style BackOld fill:#fee2e2,stroke:#ef4444,stroke-width:2px
-    style NewBack fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+    style Front fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style BackOld fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    style Dead fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    style NewBack fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
 ```
 
 If your frontend tried to communicate with backend Pods using direct Pod IPs, your application would break every time a Pod restarted!
@@ -42,14 +43,15 @@ flowchart TD
     Svc -->|kube-proxy Load Balancing| Pod2["Pod Replica 2 (10.244.2.25)"]
     Svc -->|kube-proxy Load Balancing| Pod3["Pod Replica 3 (10.244.3.40)"]
 
-    style Svc fill:#fef3c7,stroke:#d97706,stroke-width:2px
-    style Pod1 fill:#dcfce7,stroke:#16a34a,stroke-width:1px
-    style Pod2 fill:#dcfce7,stroke:#16a34a,stroke-width:1px
-    style Pod3 fill:#dcfce7,stroke:#16a34a,stroke-width:1px
+    style Client fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style Svc fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style Pod1 fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style Pod2 fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style Pod3 fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
 ```
 
 > **The Golden Definition**:  
-> A **Kubernetes Service** provides a **permanent, stable Virtual IP (ClusterIP) and internal DNS name** that acts as a built-in load balancer across a dynamic, changing set of Pod replicas.
+> **Kubernetes Service**: An abstract API object that defines a logical set of pods and a policy by which to access them, providing a persistent Virtual IP and stable DNS name across ephemeral pod lifetimes.
 
 ---
 
@@ -64,22 +66,36 @@ Kubernetes enforces a **flat, direct-routing network model**. Every Pod in the c
 This flat network is established by **CNI (Container Network Interface) plugins** such as Calico, Cilium, or Flannel.
 
 ### 2. What is a Kubernetes Service? (Straightforward Definition)
+> **Book Definition**: A Kubernetes Service is an abstraction which defines a logical set of Pods and a policy by which to access them, targeted via label selectors and exposed through a stable network endpoint.
+
 A **Kubernetes Service** is an abstract resource that defines a logical set of Pods and a policy by which to access them. Because Pods are ephemeral and frequently recreated with new, dynamic IP addresses, you never point clients or other services directly at a Pod's IP. 
 
 Instead, you create a Service with a **label selector** (e.g., `app: order-service`). Kubernetes automatically assigns this Service a static **Virtual IP (ClusterIP)** and registers an internal DNS name (`order-service.default.svc.cluster.local`) with CoreDNS. When an application sends a request to the Service's Virtual IP or DNS name, Kubernetes intercepts the network packets at the Linux kernel level and transparently load-balances them across all healthy Pods matching that label selector.
 
 ### 3. How the Four Service Types Work in Practice
-* **`ClusterIP` (Internal Only - The Default):** Exposes the Service on an internal Virtual IP reachable only from *inside* the Kubernetes cluster. This is the standard choice for databases, caching layers, and private backend microservices that should never be exposed directly to the outside internet.
-* **`NodePort` (Testing & On-Premise Access):** Opens a dedicated static port (within the range `30000–32767`) on **every single worker node** in the cluster. Any external traffic hitting `<NodeIP>:<NodePort>` is forwarded to the Service and load-balanced to backend Pods. This is primarily used for quick debugging or on-premise clusters lacking cloud load-balancer integrations.
-* **`LoadBalancer` (Cloud-Native Production):** Designed for public-facing applications hosted on cloud providers (AWS, GCP, Azure). When created, Kubernetes talks to the cloud provider's API to automatically provision a managed cloud load balancer (e.g., AWS Network Load Balancer) with a public static IP address that routes external internet traffic into your cluster's services.
-* **`Headless Service` (`clusterIP: None`):** Intentionally allocates **no Virtual IP**. Instead of load-balancing requests through `kube-proxy`, CoreDNS directly returns the individual A-records of all backing Pods. This is strictly required for stateful distributed systems like **Apache Kafka** and **Cassandra**, where client libraries must open point-to-point connections with the specific broker leading a partition.
+* **`ClusterIP` (Internal Only - The Default):**
+  - *Book Definition*: ClusterIP is the default Kubernetes service type that assigns an immutable internal IP address reachable exclusively within the cluster network.
+  - Exposes the Service on an internal Virtual IP reachable only from *inside* the Kubernetes cluster. This is the standard choice for databases, caching layers, and private backend microservices that should never be exposed directly to the outside internet.
+* **`NodePort` (Testing & On-Premise Access):**
+  - *Book Definition*: NodePort is a service type that exposes the workload on a dedicated high-range port across every node's external IP address, facilitating direct cluster-external access.
+  - Opens a dedicated static port (within the range `30000–32767`) on **every single worker node** in the cluster. Any external traffic hitting `<NodeIP>:<NodePort>` is forwarded to the Service and load-balanced to backend Pods. This is primarily used for quick debugging or on-premise clusters lacking cloud load-balancer integrations.
+* **`LoadBalancer` (Cloud-Native Production):**
+  - *Book Definition*: LoadBalancer is a service type that automatically provisions an external cloud load balancer to route public internet traffic directly into the cluster service.
+  - Designed for public-facing applications hosted on cloud providers (AWS, GCP, Azure). When created, Kubernetes talks to the cloud provider's API to automatically provision a managed cloud load balancer (e.g., AWS Network Load Balancer) with a public static IP address that routes external internet traffic into your cluster's services.
+* **`Headless Service` (`clusterIP: None`):**
+  - *Book Definition*: A Headless Service is a service configured with clusterIP set to None that bypasses proxy load balancing and returns direct DNS A-records pointing to individual pod IPs.
+  - Intentionally allocates **no Virtual IP**. Instead of load-balancing requests through `kube-proxy`, CoreDNS directly returns the individual A-records of all backing Pods. This is strictly required for stateful distributed systems like **Apache Kafka** and **Cassandra**, where client libraries must open point-to-point connections with the specific broker leading a partition.
 
 ### 4. What is an Ingress Controller? (Layer 7 Routing)
+> **Book Definition**: Ingress is an API resource that manages external Layer 7 HTTP and HTTPS access to services within a cluster, providing path-based and host-based routing, traffic load balancing, and SSL/TLS termination.
+
 While a `LoadBalancer` Service operates at **Layer 4 (Transport / TCP)**, managing separate cloud load balancers for dozens of microservices becomes prohibitively expensive ($20–$30/month per load balancer) and cannot inspect HTTP URLs. 
 
 An **Ingress** operates at **Layer 7 (Application / HTTP & HTTPS)**. It provides a single entry point into the cluster running behind a single cloud load balancer. The **Ingress Controller** (such as NGINX Ingress, Traefik, or Envoy) acts as a smart reverse-proxy that examines incoming HTTP request paths (e.g., `/api/orders` vs. `/api/notifications`) or domain hostnames (`orders.company.com`) and routes traffic to the appropriate internal `ClusterIP` Service. It also centralizes SSL/TLS certificate termination and rate-limiting.
 
 ### 5. NetworkPolicies: Enforcing Zero-Trust Cluster Security
+> **Book Definition*: A NetworkPolicy is a security specification that governs Layer 3 and Layer 4 network communication rules between pod selectors, namespaces, and IP blocks.
+
 By default, Kubernetes implements an open network topology: any Pod in any namespace can communicate with any other Pod. If an attacker breaches an internet-facing frontend pod, they can freely explore internal cluster networks and connect to sensitive databases.
 
 A **NetworkPolicy** acts as a built-in stateful firewall at Layer 3 and Layer 4. By defining label-based ingress and egress rules, you enforce the **Principle of Least Privilege**: for example, declaring that the PostgreSQL database pod will accept incoming TCP traffic on port 5432 *only* if the originating pod carries the label `role: backend-api`. All other connections are dropped at the kernel packet level by the CNI plugin.
@@ -108,10 +124,11 @@ flowchart LR
         H["4. Headless (None)\nDirect Pod IPs via DNS\n(Kafka, StatefulSets)"]
     end
 
-    style C fill:#eff6ff,stroke:#2563eb,stroke-width:2px
-    style N fill:#fef3c7,stroke:#d97706,stroke-width:2px
-    style L fill:#dcfce7,stroke:#16a34a,stroke-width:2px
-    style H fill:#f3e8ff,stroke:#7e22ce,stroke-width:2px
+    style Types fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style C fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style N fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style L fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style H fill:#c4b5fd,stroke:#6d28d9,stroke-width:2px,color:#0f172a
 ```
 
 ### 1. `ClusterIP` (Default — Internal Only)
@@ -156,10 +173,14 @@ flowchart TD
     Svc2 --> PodNotif["Notification Pods"]
     Svc3 --> PodUI["Frontend Pods"]
 
-    style Ingress fill:#eff6ff,stroke:#2563eb,stroke-width:2px
-    style Svc1 fill:#fef3c7,stroke:#d97706,stroke-width:1px
-    style Svc2 fill:#fef3c7,stroke:#d97706,stroke-width:1px
-    style Svc3 fill:#fef3c7,stroke:#d97706,stroke-width:1px
+    style User fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style Ingress fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style Svc1 fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style Svc2 fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style Svc3 fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style PodOrders fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style PodNotif fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style PodUI fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
 ```
 
 ### Complete Ingress YAML Example

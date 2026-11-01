@@ -59,13 +59,25 @@ flowchart TD
     Spring_Producer -->|Async send() with CompletableFuture| Topic
     Topic --> Spring_Consumer
 
-    style Spring_Producer fill:#f0fdf4,stroke:#22c55e,stroke-width:2px
-    style Kafka_Topic fill:#fffbeb,stroke:#f59e0b,stroke-width:2px
-    style Spring_Consumer fill:#eff6ff,stroke:#3b82f6,stroke-width:2px
+    style Spring_Producer fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style Kafka_Topic fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style Spring_Consumer fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style Controller fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style Template fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style Ser fill:#e2e8f0,stroke:#334155,stroke-width:1.5px,color:#0f172a
+    style Topic fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style Factory fill:#e2e8f0,stroke:#334155,stroke-width:1.5px,color:#0f172a
+    style Deser fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    style Listener fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
 ```
 
 ### Key Abstractions:
-- **`KafkaTemplate`**: A thread-safe, high-level wrapper for producing messages. It handles connection pooling, metric collection, and serialization natively.
+- **`KafkaTemplate`**:
+  - *Book Definition*: KafkaTemplate is a high-level, thread-safe Spring abstraction that wraps an Apache Kafka Producer to execute asynchronous message publication via CompletableFutures.
+  - A thread-safe, high-level wrapper for producing messages. It handles connection pooling, metric collection, and serialization natively.
+- **`@KafkaListener`**:
+  - *Book Definition*: @KafkaListener is a Spring annotation used to declare a managed method endpoint that automatically consumes and deserializes messages from designated Kafka topics.
+  - The annotation marking methods that receive incoming messages.
 - **`MessageListenerContainer`**: The backbone of `@KafkaListener`. It manages consumer threads, offset commits, partition rebalances, and polling loops continuously in the background.
 - **`ConcurrentKafkaListenerContainerFactory`**: Factory to create container instances. You configure consumer properties (like concurrency, error handlers, and message converters) here.
 
@@ -110,10 +122,10 @@ flowchart LR
     R1 -->|Failure 2| R2["orders.v1-retry-2000\n(Delayed 2s)"]
     R2 -->|Final Failure| DLT["orders.v1-dlt\n(Dead Letter Topic)"]
 
-    style Main fill:#dcfce7,stroke:#22c55e,stroke-width:1px
-    style R1 fill:#fef3c7,stroke:#f59e0b,stroke-width:1px
-    style R2 fill:#fef3c7,stroke:#f59e0b,stroke-width:1px
-    style DLT fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+    style Main fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style R1 fill:#fde047,stroke:#b45309,stroke-width:1.5px,color:#0f172a
+    style R2 fill:#fde047,stroke:#b45309,stroke-width:1.5px,color:#0f172a
+    style DLT fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
 ```
 
 ### Pro-Level Configuration
@@ -167,6 +179,8 @@ Spring can orchestrate a 1.5 Phase Commit by linking the DB Transaction and Kafk
 If the DB commit fails, the Kafka transaction is aborted. Consumers must use `isolation.level=read_committed`.
 
 ### Solution 2: The Transactional Outbox Pattern (Enterprise Grade)
+> **Book Definition**: The Transactional Outbox Pattern is a distributed data pattern that ensures reliable event publishing by persisting business domain changes and corresponding event records within a single database ACID transaction prior to asynchronous message relay.
+
 Instead of dual-writing, you write the business entity AND an "Outbox Event" to the DB in a **single ACID transaction**. A separate background process (like Debezium CDC or a Spring `@Scheduled` poller) reads the Outbox table and publishes to Kafka.
 
 ```mermaid
@@ -180,6 +194,12 @@ flowchart TD
     note["Table: Orders\nTable: Outbox_Events"] -.-> DB
     Debezium -->|2. Tails Transaction Log| DB
     Debezium -->|3. Publishes safely| Kafka
+
+    style App fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style DB fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style note fill:#fde047,stroke:#b45309,stroke-width:1.5px,color:#0f172a
+    style Debezium fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style Kafka fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
 ```
 
 ---

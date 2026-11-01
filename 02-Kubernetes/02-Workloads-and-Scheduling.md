@@ -34,10 +34,11 @@ flowchart TD
         J["4. Job / CronJob (Batch)\n*The Freelance Contractor*\nRuns a task to completion (DB migrations, nightly backups)"]
     end
 
-    style D fill:#dcfce7,stroke:#16a34a,stroke-width:2px
-    style S fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px
-    style DS fill:#fef3c7,stroke:#d97706,stroke-width:2px
-    style J fill:#f3e8ff,stroke:#7e22ce,stroke-width:2px
+    style Controllers fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style D fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style S fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style DS fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style J fill:#c4b5fd,stroke:#6d28d9,stroke-width:2px,color:#0f172a
 ```
 
 1. **Deployments (The Burgers / Cattle)**:
@@ -61,10 +62,19 @@ In Kubernetes, you rarely run individual Pods directly. A **Workload Controller*
 
 ### Detailed Breakdown of Workload Controllers
 Each workload controller is purpose-built for a specific application architecture:
-1. **Deployments (For Stateless Applications):** A Deployment manages a stateless group of identical Pods via an underlying **ReplicaSet**. If your web server or REST API doesn't care which physical server it runs on, and doesn't store permanent data on its local disk, you use a Deployment. Deployments provide declarative rolling updates, pausing, and instant rollbacks. If any replica crashes or its host node dies, the Deployment controller instantly spawns a replacement replica.
-2. **StatefulSets (For Stateful Workloads & Databases):** Traditional databases (PostgreSQL, MySQL), message brokers (Apache Kafka), and distributed datastores (Cassandra, Elasticsearch) cannot be treated like disposable web servers. They require stable network identifiers, predictable startup and shutdown ordering, and dedicated persistent storage that survives across restarts. A **StatefulSet** assigns a stable ordinal index to each pod (e.g., `kafka-0`, `kafka-1`, `kafka-2`). When a stateful pod is deleted and recreated, it retains its exact name, its DNS identity, and automatically reconnects to its dedicated PersistentVolume.
-3. **DaemonSets (For Node-Level Infrastructure Services):** A DaemonSet ensures that **all (or selected) worker nodes run exactly one copy of a Pod**. As new worker nodes are added to the cluster, the DaemonSet controller automatically schedules a pod onto them. When a node is decommissioned, the pod is garbage-collected. DaemonSets are universally used for cluster logging agents (Fluentbit, Logstash), system monitoring daemons (Prometheus `node-exporter`), and software-defined network CNI plugins.
-4. **Jobs & CronJobs (For Batch & Scheduled Tasks):** Unlike web applications that run indefinitely, a **Job** runs a pod to completion. It ensures that a specified number of tasks successfully finish (with retries on failure) and then stops. Typical use cases include running automated database schema migrations (Liquibase, Flyway) before deploying a new app version. A **CronJob** runs Jobs on a recurring schedule based on standard cron syntax (e.g., executing nightly database backups or sending monthly billing invoices).
+1. **Deployments (For Stateless Applications):**
+   - *Book Definition*: A Deployment provides declarative updates for Pods and ReplicaSets, allowing automated rolling updates, rollbacks, and self-healing scale for stateless workloads.
+   - A Deployment manages a stateless group of identical Pods via an underlying **ReplicaSet**. If your web server or REST API doesn't care which physical server it runs on, and doesn't store permanent data on its local disk, you use a Deployment. Deployments provide declarative rolling updates, pausing, and instant rollbacks. If any replica crashes or its host node dies, the Deployment controller instantly spawns a replacement replica.
+2. **StatefulSets (For Stateful Workloads & Databases):**
+   - *Book Definition*: A StatefulSet is a workload API object used to manage stateful applications, providing guarantees about the ordering, uniqueness, and persistent storage identity of network-addressable pods.
+   - Traditional databases (PostgreSQL, MySQL), message brokers (Apache Kafka), and distributed datastores (Cassandra, Elasticsearch) cannot be treated like disposable web servers. They require stable network identifiers, predictable startup and shutdown ordering, and dedicated persistent storage that survives across restarts. A **StatefulSet** assigns a stable ordinal index to each pod (e.g., `kafka-0`, `kafka-1`, `kafka-2`). When a stateful pod is deleted and recreated, it retains its exact name, its DNS identity, and automatically reconnects to its dedicated PersistentVolume.
+3. **DaemonSets (For Node-Level Infrastructure Services):**
+   - *Book Definition*: A DaemonSet ensures that all (or some) nodes run a single copy of a pod, automatically instantiating a replica onto newly joined nodes and collecting it upon node decommissioning.
+   - A DaemonSet ensures that **all (or selected) worker nodes run exactly one copy of a Pod**. As new worker nodes are added to the cluster, the DaemonSet controller automatically schedules a pod onto them. When a node is decommissioned, the pod is garbage-collected. DaemonSets are universally used for cluster logging agents (Fluentbit, Logstash), system monitoring daemons (Prometheus `node-exporter`), and software-defined network CNI plugins.
+4. **Jobs & CronJobs (For Batch & Scheduled Tasks):**
+   - *Book Definition (Job)*: A Job creates one or more pods and will continue to retry execution until a specified number of them successfully terminate to completion.
+   - *Book Definition (CronJob)*: A CronJob creates Jobs on a recurring schedule configured via the standard crontab execution format.
+   - Unlike web applications that run indefinitely, a **Job** runs a pod to completion. It ensures that a specified number of tasks successfully finish (with retries on failure) and then stops. Typical use cases include running automated database schema migrations (Liquibase, Flyway) before deploying a new app version. A **CronJob** runs Jobs on a recurring schedule based on standard cron syntax (e.g., executing nightly database backups or sending monthly billing invoices).
 
 ### How Kubernetes Scheduling Works in Practice
 When a Pod is submitted to the cluster, its `nodeName` field is initially empty—it is in a **`Pending`** state. The **`kube-scheduler`** is the control plane component responsible for assigning the Pod to a healthy worker node. It does this in two distinct phases:
@@ -104,8 +114,16 @@ flowchart LR
         S_P1 --> S_P2["kafka-2\n(Dedicated PVC-2)"]
     end
 
-    style Deploy_Model fill:#ecfdf5,stroke:#10b981,stroke-width:2px
-    style Stateful_Model fill:#eff6ff,stroke:#2563eb,stroke-width:2px
+    style Deploy_Model fill:#f1f5f9,stroke:#16a34a,stroke-width:2px,color:#0f172a
+    style Stateful_Model fill:#f1f5f9,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style D_RS fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style D_P1 fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style D_P2 fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style D_P3 fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style SharedPVC fill:#cbd5e1,stroke:#475569,stroke-width:1.5px,color:#0f172a
+    style S_P0 fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style S_P1 fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style S_P2 fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
 ```
 
 ### The Architectural Differences:
@@ -122,6 +140,11 @@ flowchart LR
 
 ## ✈️ 4. Resource Management: Requests, Limits & QoS Classes
 
+> **Book Definitions**:
+> - *Quality of Service (QoS)*: A classification mechanism (Guaranteed, Burstable, BestEffort) assigned by Kubernetes based on container resource definitions that dictates pod eviction precedence when a worker node encounters resource starvation.
+> - *Resource Requests*: The baseline quantity of compute resources (CPU and RAM) that Kubernetes guarantees to allocate to a container, directly utilized by the scheduler for node placement.
+> - *Resource Limits*: The maximum upper boundary of compute resources that a container is permitted to consume before being throttled (CPU) or terminated via kernel OOM (Memory).
+
 ### The Flight Ticket Analogy for QoS Classes
 When a worker node runs out of physical RAM, the Linux kernel OOM Killer must step in and terminate pods. How does Kubernetes decide which pod to kill first? 
 It assigns each Pod a **Quality of Service (QoS) Class**, exactly like airline passenger tickets:
@@ -137,9 +160,10 @@ flowchart TD
         BE --> BU --> G
     end
 
-    style BE fill:#fee2e2,stroke:#ef4444,stroke-width:2px
-    style BU fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
-    style G fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+    style QoS_Tiers fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style BE fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    style BU fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style G fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
 ```
 
 ### Resource Requests vs. Limits:
@@ -151,6 +175,11 @@ flowchart TD
 ---
 
 ## 🧲 5. Advanced Scheduling: Affinity, Taints & Tolerations
+
+> **Book Definitions**:
+> - *Node Affinity*: An expressive set of scheduling constraints configured on pods that directs the kube-scheduler to attract pods to nodes with specific label key-value pairs.
+> - *Taint*: A node-level configuration attribute that repels any pod that does not possess an explicit, matching toleration.
+> - *Toleration*: A pod-level scheduling configuration that permits (but does not force) a pod to schedule onto a node with a matching taint.
 
 How do you control **where** your Pods get placed?
 
@@ -174,9 +203,9 @@ flowchart LR
     PodWeb -->|REPELLED! Cannot be placed here| NodeGPU
     PodML -->|ACCEPTED! Tolerates the taint| NodeGPU
 
-    style NodeGPU fill:#fef3c7,stroke:#d97706,stroke-width:2px
-    style PodWeb fill:#fee2e2,stroke:#ef4444,stroke-width:2px
-    style PodML fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+    style NodeGPU fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style PodWeb fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    style PodML fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
 ```
 
 ### 3. Pod Anti-Affinity (High Availability Rule)

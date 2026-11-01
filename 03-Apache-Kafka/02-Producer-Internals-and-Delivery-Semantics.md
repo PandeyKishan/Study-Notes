@@ -34,9 +34,12 @@ flowchart LR
     Acc -->|Bus departs when batch.size (64KB) full\nOR linger.ms (10ms) expires| Sender["Background Sender Thread\nTransmits single TCP batch"]
     Sender --> Broker["Kafka Broker Leader"]
 
-    style Acc fill:#eff6ff,stroke:#2563eb,stroke-width:2px
-    style Sender fill:#fef3c7,stroke:#d97706,stroke-width:2px
-    style Broker fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+    style Record1 fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style Record2 fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style Record3 fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style Acc fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style Sender fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style Broker fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
 ```
 
 2. **The Postal Delivery Analogy (`acks` = 0, 1, all)**:
@@ -55,6 +58,14 @@ A **Kafka Producer** is a client application or library responsible for publishi
 Publishing to Kafka is fundamentally asynchronous and decoupled. When an application calls `producer.send()`, the thread does not block waiting for the message to travel across the network and reach disk; instead, the record is placed into an internal high-speed memory buffer, and a future/callback is returned immediately.
 
 ### What Happens Behind the Scenes During `producer.send()`?
+> **Book Definitions**:
+> - *ProducerRecord*: A ProducerRecord is an object representing an individual key-value pair, target topic, optional partition number, timestamp, and metadata headers to be published to Kafka.
+> - *RecordAccumulator*: The RecordAccumulator is an in-memory client buffer pool that groups newly produced records into batches segmented by topic-partition to optimize network I/O throughput.
+> - *batch.size*: batch.size is a producer configuration setting that defines the maximum memory threshold in bytes allocated for batching records destined for a single partition.
+> - *linger.ms*: linger.ms is an artificial producer latency threshold in milliseconds that delays sending to allow additional records to accumulate into the current batch.
+> - *acks*: acks is a producer setting that controls the number of partition broker acknowledgments required before considering an append request complete.
+> - *Idempotent Producer*: An Idempotent Producer is a Kafka producer mode that assigns producer IDs and monotonic sequence numbers to ensure exactly-once message logging per partition across transient network retries.
+
 When your code executes `producer.send(new ProducerRecord<>("orders", customerId, orderJson))`, Kafka's internal pipeline executes four sequential phases:
 1. **Serialization:** Kafka only stores raw byte arrays. The producer runs configured serializers (such as `StringSerializer`, `JsonSerializer`, or `KafkaAvroSerializer`) to convert your Java/Python objects into binary bytes.
 2. **Partition Selection:** If the message has a key (`customerId`), Kafka computes a 32-bit Murmur2 hash of that key: `abs(Murmur2(key)) % num_partitions`. This ensures that all events for that specific customer are guaranteed to land on the exact same partition in chronological order. If no key is provided, modern Kafka uses the **Sticky Partitioner** to pack messages into the current active partition batch until full before rotating to the next.
@@ -109,9 +120,16 @@ flowchart TD
         end
     end
 
-    style P0 fill:#dcfce7,stroke:#16a34a,stroke-width:2px
-    style P1 fill:#eff6ff,stroke:#2563eb,stroke-width:1px
-    style P2 fill:#fef3c7,stroke:#d97706,stroke-width:1px
+    style Topic fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style P0 fill:#ffffff,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style P1 fill:#ffffff,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style P2 fill:#ffffff,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style E1 fill:#86efac,stroke:#15803d,stroke-width:1.5px,color:#0f172a
+    style E2 fill:#86efac,stroke:#15803d,stroke-width:1.5px,color:#0f172a
+    style E3 fill:#86efac,stroke:#15803d,stroke-width:1.5px,color:#0f172a
+    style EB1 fill:#93c5fd,stroke:#1d4ed8,stroke-width:1.5px,color:#0f172a
+    style EB2 fill:#93c5fd,stroke:#1d4ed8,stroke-width:1.5px,color:#0f172a
+    style EC1 fill:#fde047,stroke:#b45309,stroke-width:1.5px,color:#0f172a
 ```
 
 ### How Kafka Decides Which Partition to Write To:
@@ -140,7 +158,10 @@ flowchart TD
         C <--> A
     end
 
-    style Golden_Triangle fill:#f0fdf4,stroke:#16a34a,stroke-width:2px
+    style Golden_Triangle fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style A fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style B fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style C fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
 ```
 
 ### Why all three are required:

@@ -20,9 +20,9 @@ flowchart LR
     Dev["Developer (Mac + Python 3.11)\n'Works on my machine! 🟢'"] -->|Sends Code| QA["QA Tester (Windows + Python 3.10)\n'Crashes with DLL error! 🔴'"]
     QA -->|Sends Code| Prod["Production Server (CentOS + Python 3.8)\n'Missing glibc library! 💥'"]
 
-    style Dev fill:#ecfdf5,stroke:#10b981,stroke-width:2px
-    style QA fill:#fef2f2,stroke:#ef4444,stroke-width:2px
-    style Prod fill:#fef2f2,stroke:#ef4444,stroke-width:2px
+    style Dev fill:#bbf7d0,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style QA fill:#fecaca,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    style Prod fill:#fecaca,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
 ```
 
 This classic developer nightmare is called the **"Matrix from Hell"** ($N$ applications $\times$ $M$ operating systems and hardware environments).
@@ -62,8 +62,10 @@ flowchart TD
         DCont --> Cloud["AWS / GCP / Bare Metal K8s"]
     end
 
-    style Box fill:#dbeafe,stroke:#3b82f6,stroke-width:2px
-    style DCont fill:#dcfce7,stroke:#22c55e,stroke-width:2px
+    style Box fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style DCont fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style Real_World fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style Software_World fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
 ```
 
 > **The Golden Rule**: **Docker is the shipping container of the software world.**
@@ -90,12 +92,12 @@ flowchart LR
     Img -->|docker run| C2["Container 2 (Port 8081)\nRunning Process"]
     Img -->|docker run| C3["Container 3 (Port 8082)\nRunning Process"]
 
-    style DF fill:#f3f4f6,stroke:#4b5563,stroke-width:2px
-    style Img fill:#dbeafe,stroke:#2563eb,stroke-width:2px
-    style Reg fill:#fef3c7,stroke:#d97706,stroke-width:2px
-    style C1 fill:#dcfce7,stroke:#16a34a,stroke-width:2px
-    style C2 fill:#dcfce7,stroke:#16a34a,stroke-width:2px
-    style C3 fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+    style DF fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style Img fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style Reg fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style C1 fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style C2 fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style C3 fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
 ```
 
 ---
@@ -168,8 +170,8 @@ flowchart TB
         SharedKernel --> HostHW2["Physical Host Hardware (CPU, RAM, NIC)"]
     end
 
-    style VM_Arch fill:#f8fafc,stroke:#94a3b8,stroke-width:2px
-    style Cont_Arch fill:#f0fdf4,stroke:#22c55e,stroke-width:2px
+    style VM_Arch fill:#e2e8f0,stroke:#475569,stroke-width:2px,color:#0f172a
+    style Cont_Arch fill:#bbf7d0,stroke:#15803d,stroke-width:2px,color:#0f172a
 ```
 
 ### Deep Technical Comparison: What Actually Happens Under the Hood?
@@ -220,31 +222,38 @@ mindmap
 
 ### A. Linux Namespaces (Isolation: "What You Can See")
 
+*Book Definition*: **Linux Namespaces** are a fundamental Linux kernel feature that partitions kernel resources so that one set of processes sees one set of resources while another set of processes sees an entirely different, isolated set.
+
 *Analogy: A private hotel room.* Even though all guests share the same hotel foundation, inside room 302 you have your own private bathroom, your own phone extension, and you cannot see the guest in room 303.
 
 Namespaces are created using the `clone()`, `unshare()`, and `setns()` Linux system calls:
 
 1. **PID Namespace (`CLONE_NEWPID`)**:
-   - Isolates the process tree.
+   - *Book Definition*: Isolates the process ID number space, allowing a container's main process to be PID 1 while appearing as a standard unprivileged PID on the host.
    - Inside the container, your application process thinks it is **PID 1** (the master process).
    - Outside on the host system, the kernel sees it as regular process PID `38491`.
 2. **NET Namespace (`CLONE_NEWNET`)**:
+   - *Book Definition*: Virtualizes network controllers, IP addresses, port ranges, routing tables, and firewall rules independently for each container.
    - Provides an isolated virtual network stack: its own loopback (`127.0.0.1`), its own virtual ethernet interface (`eth0`), private routing table, and private port bindings.
    - Two different containers can both listen on port `8080` on the same host without any conflict!
 3. **MNT Namespace (`CLONE_NEWNS`)**:
-   - Isolates the filesystem mount points.
+   - *Book Definition*: Isolates the system mount points seen by processes, enabling a container to construct its own private root filesystem tree.
    - The container cannot see `/` of the host; it only sees the folder designated as its root.
    - Modern runtimes use `pivot_root` (NOT just `chroot`) to permanently swap out the root filesystem securely so escaping into the host filesystem is prevented.
 4. **UTS Namespace (`CLONE_NEWUTS`)**:
-   - Isolates hostname and domain name. The container can name itself `order-service` without renaming the host server.
+   - *Book Definition*: Isolates hostnames and NIS domain names, allowing containers to possess unique hostnames independent of the host machine.
+   - The container can name itself `order-service` without renaming the host server.
 5. **IPC Namespace (`CLONE_NEWIPC`)**:
-   - Isolates Inter-Process Communication (POSIX message queues, shared memory).
+   - *Book Definition*: Isolates Inter-Process Communication resources, preventing processes across different containers from sharing memory segments or POSIX message queues.
 6. **USER Namespace (`CLONE_NEWUSER`)**:
+   - *Book Definition*: Maps a container's internal user and group ID numbers to distinct host UID/GID ranges for non-root security.
    - Maps user and group IDs. User `root` (UID 0) inside the container is mapped to an unprivileged user (e.g., UID 10001) on the host, drastically reducing security risks.
 
 ---
 
 ### B. Linux Control Groups / cgroups (Metering: "What You Can Use")
+
+*Book Definition*: **Control Groups (cgroups)** are a Linux kernel subsystem that organizes processes hierarchically to meter, allocate, throttle, and enforce hard limits on physical hardware resources (CPU, RAM, block I/O, network bandwidth, and PID counts).
 
 *Analogy: The utility meter and fuse box in your apartment.* It caps your electricity and water consumption so one resident cannot drain the building's entire supply.
 
@@ -288,23 +297,30 @@ flowchart TD
     Lower3 --> Lower2
     Lower2 --> Lower1
 
-    style MV fill:#eff6ff,stroke:#1d4ed8,stroke-width:2px
-    style Upper fill:#fef3c7,stroke:#d97706,stroke-width:2px
-    style Lower3 fill:#f3f4f6,stroke:#4b5563,stroke-width:1px
-    style Lower2 fill:#f3f4f6,stroke:#4b5563,stroke-width:1px
-    style Lower1 fill:#f3f4f6,stroke:#4b5563,stroke-width:1px
+    style Merged_View fill:#bfdbfe,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style MV fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style Layers fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style Upper fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style Lower3 fill:#cbd5e1,stroke:#334155,stroke-width:2px,color:#0f172a
+    style Lower2 fill:#cbd5e1,stroke:#334155,stroke-width:2px,color:#0f172a
+    style Lower1 fill:#cbd5e1,stroke:#334155,stroke-width:2px,color:#0f172a
 ```
 
 ### The Three Critical Rules of Overlay2:
 
+*Book Definition*: **Overlay2** is a union mount filesystem implementation in the Linux kernel that combines multiple underlying directories into a single unified directory structure without modifying original underlying files.
+
 1. **Shared Read-Only Layers (`LowerDir`)**:
+   - *Book Definition*: LowerDir consists of one or more stacked, immutable image layers that provide the base operating system and application files.
    - All image layers are immutable. If you start 100 containers from the same `ubuntu:latest` image, all 100 containers read from the **exact same lower layer on disk**. They consume zero extra disk space!
 2. **Ephemeral Read-Write Layer (`UpperDir`)**:
+   - *Book Definition*: UpperDir is the topmost writable directory layer created per container where all runtime modifications and newly generated files are recorded.
    - When a container starts, Docker places a razor-thin, writable layer on top.
    - Any new file created by the container is saved here.
 3. **Copy-on-Write (CoW) / `copy_up`**:
+   - *Book Definition*: Copy-on-Write (CoW) is an operating system storage optimization where an existing read-only file is copied to writable storage only when a write operation is initiated.
    - If a container modifies an existing file from a lower layer, OverlayFS executes a `copy_up` operation: it copies the file up to the `UpperDir` and applies changes there. The original lower layer remains pristine and untouched.
-   - *Whiteouts*: If a file in a lower layer is deleted, Overlay2 writes a special "whiteout" character device in the upper layer to hide it from the merged view.
+   - *Whiteouts*: *Book Definition: A whiteout is a special character device with 0/0 device numbers written to UpperDir to mask a deleted file that exists in LowerDir.* Overlay2 writes this special "whiteout" character device in the upper layer to hide it from the merged view.
 
 ---
 
@@ -321,23 +337,23 @@ flowchart LR
     Shim --> Runc["runc\n(Low-Level OCI Runtime)"]
     Runc -->|clone, unshare, pivot_root| AppProc["Your Container Process\n(PID in isolated namespace)"]
 
-    style CLI fill:#f3f4f6,stroke:#374151,stroke-width:2px
-    style Daemon fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px
-    style Cntd fill:#e0e7ff,stroke:#4338ca,stroke-width:2px
-    style Shim fill:#fef3c7,stroke:#d97706,stroke-width:2px
-    style Runc fill:#fce7f3,stroke:#be185d,stroke-width:2px
-    style AppProc fill:#dcfce7,stroke:#15803d,stroke-width:2px
+    style CLI fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style Daemon fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style Cntd fill:#c7d2fe,stroke:#4338ca,stroke-width:2px,color:#0f172a
+    style Shim fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style Runc fill:#fbcfe8,stroke:#be185d,stroke-width:2px,color:#0f172a
+    style AppProc fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
 ```
 
 ### Component Breakdown:
 
-- **Docker CLI**: The user interface. It converts commands (`docker build`, `docker run`) into HTTP REST calls sent to `/var/run/docker.sock`.
-- **`dockerd`**: The daemon managing network creation, storage volumes, image registry authentication, and high-level Docker features.
-- **`containerd`**: The robust container manager. Handles image downloads (pulling), unpacking, and supervising container lifecycles. (Kubernetes speaks directly to `containerd` via the Container Runtime Interface [CRI], skipping `dockerd` entirely!).
-- **`containerd-shim`**: A lightweight monitor process. When `runc` creates the container, `runc` exits immediately. The `containerd-shim` remains running as the parent of the container process.
+- **Docker CLI**: The user interface. *Book Definition: A command-line client that accepts user input and serializes instructions into RESTful HTTP requests directed to the Docker Engine API.*
+- **`dockerd`**: The Docker daemon. *Book Definition: A persistent background service responsible for orchestrating container objects, managing image downloads, volume allocation, and virtual networking.*
+- **`containerd`**: The robust container manager. *Book Definition: An industry-standard, CNCF-graduated container runtime that oversees the complete container lifecycle, image distribution, and execution via the Container Runtime Interface (CRI).* (Kubernetes speaks directly to `containerd` via CRI, skipping `dockerd` entirely!).
+- **`containerd-shim`**: A lightweight monitor process. *Book Definition: A thin daemon process that acts as the subreaper parent of a running container, maintaining standard I/O streams and exit codes independently of runtime restarts.*
   > **Why the shim is a lifesaver in production**: Because the shim acts as the parent process, you can restart or upgrade `dockerd` or `containerd` without killing running containers (known as **Live Restore**)!
   >
-- **`runc`**: The reference implementation of the OCI runtime. It executes the actual Linux system calls (`clone`, `pivot_root`, cgroup setup) to launch the container process, and then terminates.
+- **`runc`**: The reference implementation of the OCI runtime. *Book Definition: A low-level, lightweight command-line tool implemented to the OCI runtime specification that executes direct Linux system calls (`clone`, `setns`, `pivot_root`) to spawn containers.*
 
 ---
 

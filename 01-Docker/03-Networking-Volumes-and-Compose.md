@@ -31,7 +31,11 @@ flowchart TD
     P2 ==> S2
     P3 ==> S3
 
-    style Solutions fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+    style Problems fill:#fecaca,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    style Solutions fill:#bbf7d0,stroke:#15803d,stroke-width:2px,color:#14532d
+    style S1 fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style S2 fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style S3 fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
 ```
 
 ---
@@ -108,22 +112,29 @@ flowchart TD
         API -->|TCP Call: postgres:5432\n(Docker DNS resolves 'postgres'!)| DB[("PostgreSQL Database\nInternal IP: 172.20.0.4\n*Port 5432 NOT exposed to Internet!*")]
     end
 
-    style Outside fill:#eff6ff,stroke:#1d4ed8,stroke-width:1px
-    style DockerHost fill:#f0fdf4,stroke:#16a34a,stroke-width:2px
-    style DB fill:#fef3c7,stroke:#d97706,stroke-width:2px
+    style Outside fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style DockerHost fill:#bbf7d0,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style Browser fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style Web fill:#c7d2fe,stroke:#4338ca,stroke-width:2px,color:#0f172a
+    style API fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style DB fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
 ```
 
 ### Docker Network Drivers Explained:
 1. **Bridge (Default)**:
+   - *Book Definition*: A software-based network switch managed by Docker that allows containers connected to the same bridge network to communicate while providing isolation from external networks.
    - Creates a virtual private software bridge inside the host.
    - Containers get private IPs (e.g., `172.18.0.x`).
    - *CRITICAL INTERVIEW FACT*: The **default bridge** (`docker0`) does **not** provide automatic DNS name resolution. You **must** create a **user-defined bridge network** (`docker network create my-net`) to get automatic DNS resolution!
 2. **Host Network (`--network host`)**:
+   - *Book Definition*: A network driver that bypasses network namespace isolation, allowing a container to attach directly to the host machine's physical network interfaces and port space.
    - Skips network isolation entirely. The container binds directly to the host's network interfaces.
    - Offers maximum performance (zero NAT overhead), but port conflicts can occur.
 3. **None (`--network none`)**:
+   - *Book Definition*: A driver that provisions only an internal loopback interface, completely disabling all external and inter-container network I/O for security isolation.
    - Completely air-gapped with no network access except local loopback. Used for secure offline batch jobs.
 4. **Overlay Network**:
+   - *Book Definition*: A distributed multi-host network driver using VXLAN tunneling to encapsulate packet frames across multiple physical or cloud hosts.
    - Connects multiple Docker daemons across different physical machines (used in Docker Swarm and Kubernetes).
 
 ---
@@ -150,25 +161,28 @@ flowchart LR
     Bind ==>|2. Best for Local Development & Hot-Reload| App
     Tmp ==>|3. Best for Sensitive In-Memory Secrets| App
 
-    style Vol fill:#dcfce7,stroke:#16a34a,stroke-width:2px
-    style Bind fill:#eff6ff,stroke:#2563eb,stroke-width:2px
-    style Tmp fill:#fee2e2,stroke:#ef4444,stroke-width:2px
+    style Host_Storage fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style Running_Container fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style Vol fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style Bind fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style Tmp fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    style App fill:#cbd5e1,stroke:#334155,stroke-width:2px,color:#0f172a
 ```
 
 ### Storage Decision Matrix:
 
 | Type | How It Works | Best Use Case | Command Example |
 | :--- | :--- | :--- | :--- |
-| **Named Volume** | Docker creates and manages a folder inside `/var/lib/docker/volumes/`. High performance, completely independent of host directory structure. | **Production Databases (PostgreSQL, MySQL, MongoDB), Kafka logs.** | `docker run -v pg_data:/var/lib/postgresql/data postgres:15` |
-| **Bind Mount** | Directly mounts an exact file or folder from your computer into the container. | **Local Development**: Mount your local source code into the container so you can edit code and see hot-reloading without rebuilding images! | `docker run -v $(pwd)/src:/app/src node:20` |
-| **`tmpfs` Mount** | Stores data purely in the host machine's RAM memory. Never writes to disk. | **Sensitive tokens, passwords, private keys** that must vanish the second the container stops. | `docker run --tmpfs /tmp/secrets my-app` |
+| **Named Volume** | *Book Definition: A persistent storage directory managed entirely by the Docker daemon at `/var/lib/docker/volumes/`, isolated from host directory changes.* High performance, completely independent of host directory structure. | **Production Databases (PostgreSQL, MySQL, MongoDB), Kafka logs.** | `docker run -v pg_data:/var/lib/postgresql/data postgres:15` |
+| **Bind Mount** | *Book Definition: A direct filesystem mapping that mounts a file or directory from the host machine directly into a container path, mirroring host permissions.* Directly mounts an exact file or folder from your computer into the container. | **Local Development**: Mount your local source code into the container so you can edit code and see hot-reloading without rebuilding images! | `docker run -v $(pwd)/src:/app/src node:20` |
+| **`tmpfs` Mount** | *Book Definition: A volatile storage mount located entirely within host system RAM that never commits data to underlying disk storage.* Stores data purely in the host machine's RAM memory. Never writes to disk. | **Sensitive tokens, passwords, private keys** that must vanish the second the container stops. | `docker run --tmpfs /tmp/secrets my-app` |
 
 ---
 
 ## 🎼 5. Docker Compose: The Conductor of Multi-Container Apps
 
 ### What is Docker Compose?
-**Docker Compose** is a tool for defining and running multi-container Docker applications using a single declarative YAML file (`compose.yaml` or `docker-compose.yml`).
+*Book Definition*: **Docker Compose** is a declarative orchestration tool for defining, configuring, and executing multi-container Docker applications using structured YAML configuration files.
 
 ### Production-Ready Example: Frontend + Spring Boot Backend + PostgreSQL + Kafka
 *(Aligned with our Hands-On Capstone Project)*

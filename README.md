@@ -20,10 +20,11 @@ flowchart TD
         CI["🚀 4. CI/CD\n*The Automated Car Assembly Line*\nContinuous automated conveyor belt testing and shipping code safely with zero downtime."]
     end
 
-    style D fill:#dbeafe,stroke:#1d4ed8,stroke-width:2px
-    style K fill:#dcfce7,stroke:#16a34a,stroke-width:2px
-    style KF fill:#fffbeb,stroke:#f59e0b,stroke-width:2px
-    style CI fill:#f3e8ff,stroke:#7e22ce,stroke-width:2px
+    style Analogies fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style D fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style K fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style KF fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style CI fill:#c4b5fd,stroke:#6d28d9,stroke-width:2px,color:#0f172a
 ```
 
 ---
@@ -72,10 +73,25 @@ flowchart TD
         KafkaTopic -.-> PVC2["Kafka Log Storage (NVMe/SSD)"]
     end
 
-    style Developer_Workflow fill:#f9fbfd,stroke:#3b82f6,stroke-width:2px
-    style Kubernetes_Cluster fill:#fbfcfd,stroke:#10b981,stroke-width:2px
-    style Messaging_Fabric fill:#fffbf5,stroke:#f59e0b,stroke-width:2px
-    style Storage_Layer fill:#fdfbf7,stroke:#8b5cf6,stroke-width:2px
+    style Developer_Workflow fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style Kubernetes_Cluster fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style Messaging_Fabric fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style Storage_Layer fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style Dev fill:#e2e8f0,stroke:#334155,stroke-width:1.5px,color:#0f172a
+    style GH fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style CI fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style Sec fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style Reg fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style CD fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style K8sAPI fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style Nodes fill:#e2e8f0,stroke:#334155,stroke-width:1.5px,color:#0f172a
+    style Ingress fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style SvcA fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style KafkaTopic fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style SvcB fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style SvcC fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style PVC1 fill:#c4b5fd,stroke:#6d28d9,stroke-width:2px,color:#0f172a
+    style PVC2 fill:#c4b5fd,stroke:#6d28d9,stroke-width:2px,color:#0f172a
 ```
 
 ---

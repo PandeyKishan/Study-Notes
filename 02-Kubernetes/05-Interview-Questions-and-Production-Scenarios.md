@@ -9,7 +9,7 @@
 
 ```mermaid
 flowchart TD
-    PodStatus["Pod Not Healthy / Failing"] --> CheckState{"Examine Status: kubectl describe pod <pod-name>"}
+    PodStatus["Pod Not Healthy / Failing"] --> CheckState{"Examine Status:\nkubectl describe pod <pod-name>"}
     
     CheckState -->|Pending| SchedFail["Kube-Scheduler cannot place pod:\n1. Insufficient Node CPU/RAM\n2. Taints without Tolerations\n3. NodeSelector / Affinity mismatch\n4. PVC unbound"]
     CheckState -->|ImagePullBackOff / ErrImagePull| ImageFail["Image pull failure:\n1. Typo in image name/tag\n2. Missing imagePullSecrets\n3. Rate limiting (Docker Hub 429)"]
@@ -17,11 +17,13 @@ flowchart TD
     CheckState -->|OOMKilled (137)| OOM["Container memory usage > resources.limits.memory\nKernel cgroup OOM killer terminated process"]
     CheckState -->|Running but 0/1 Ready| ProbeFail["Readiness probe failing:\nContainer alive but failing /health endpoint.\nTraffic is NOT routed to this pod"]
 
-    style SchedFail fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
-    style ImageFail fill:#fee2e2,stroke:#ef4444,stroke-width:2px
-    style AppCrash fill:#fee2e2,stroke:#ef4444,stroke-width:2px
-    style OOM fill:#fee2e2,stroke:#ef4444,stroke-width:2px
-    style ProbeFail fill:#e0f2fe,stroke:#0284c7,stroke-width:2px
+    style PodStatus fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style CheckState fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style SchedFail fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style ImageFail fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    style AppCrash fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    style OOM fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    style ProbeFail fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
 ```
 
 ---
@@ -29,12 +31,16 @@ flowchart TD
 ## 2. Advanced Debugging Scenarios
 
 ### 2.1 Deep Dive: Debugging `OOMKilled` (Exit Code 137)
+> **Book Definition**: OOMKilled (Exit Code 137) is an operating system kernel event where a container process is terminated via SIGKILL for attempting to allocate more memory than permitted by its cgroup memory limit.
+
 While standard answers cite `resources.limits.memory`, Staff-level debugging requires understanding Linux cgroups and memory types.
 - **cgroups v1 vs v2**: Kubernetes uses cgroups to restrict resource usage. In cgroups v1, the kernel tracks total memory as `RSS (Resident Set Size) + Page Cache`. If your application writes large files, the Page Cache grows. If `RSS + Cache` hits the limit, the kernel tries to reclaim cache. If it can't reclaim fast enough, the OOM Killer is invoked!
 - **Pro-Tip**: Look at `/sys/fs/cgroup/memory/memory.stat` (cgroup v1) or `memory.stat` (cgroup v2) to differentiate between `rss` and `cache`. 
 - **Java/JVM**: Ensure `MaxRAMPercentage` is set so the JVM respects cgroup limits, rather than host memory.
 
 ### 2.2 Deep Dive: Debugging `CrashLoopBackOff`
+> **Book Definition**: CrashLoopBackOff is a Kubernetes state indicating that a pod is repeatedly starting, failing, and restarting with an exponentially increasing backoff delay.
+
 A container exits prematurely. Standard debugging uses `kubectl logs -p`. Advanced techniques include:
 - **Ephemeral Containers**: Since 1.23, you can use `kubectl debug -it <pod> --image=busybox` to attach a debugging container to a crashing pod's namespace. This allows network tests (`curl`, `nslookup`) and filesystem inspection without restarting the pod.
 - **Core Dumps**: If it's a segmentation fault (Exit code 139), configure the host's `core_pattern` and mount a hostPath volume to capture core dumps for `gdb` analysis.

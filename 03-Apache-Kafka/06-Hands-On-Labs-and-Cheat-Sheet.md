@@ -11,7 +11,7 @@ Apache Kafka has officially deprecated ZooKeeper in favor of **KRaft (Kafka Raft
 
 ```mermaid
 flowchart TD
-    subgraph "Legacy ZooKeeper Architecture"
+    subgraph Legacy["Legacy ZooKeeper Architecture"]
         ZK1[(ZooKeeper 1)] --- ZK2[(ZooKeeper 2)]
         ZK2 --- ZK3[(ZooKeeper 3)]
         
@@ -20,7 +20,7 @@ flowchart TD
         B3[Broker 3] --> ZK2
     end
     
-    subgraph "Modern KRaft Architecture"
+    subgraph Modern["Modern KRaft Architecture"]
         C1((Controller 1)) --- C2((Controller 2))
         C2 --- C3((Controller 3))
         
@@ -31,6 +31,14 @@ flowchart TD
         note[Controllers are just Kafka nodes\nrunning with process.roles=controller]
         C1 -.- note
     end
+
+    style Legacy fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style Modern fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style ZK1,ZK2,ZK3 fill:#fca5a5,stroke:#dc2626,stroke-width:1.5px,color:#7f1d1d
+    style B1,B2,B3 fill:#e2e8f0,stroke:#334155,stroke-width:1.5px,color:#0f172a
+    style C1,C2,C3 fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style KB1,KB2,KB3 fill:#93c5fd,stroke:#1d4ed8,stroke-width:1.5px,color:#0f172a
+    style note fill:#fde047,stroke:#b45309,stroke-width:1.5px,color:#0f172a
 ```
 
 ---

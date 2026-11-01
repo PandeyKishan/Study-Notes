@@ -24,6 +24,10 @@ In technical interviews, interviewers evaluate three tiers of competence:
 ---
 
 ### Q2: What is the difference between a Docker Image and a Docker Container?
+> **Book Definitions**:
+> - *Docker Image*: An immutable, read-only template composed of layered filesystem instructions that defines the code, libraries, and runtime environment needed to execute an application.
+> - *Docker Container*: A runnable, isolated process instance instantiated from a Docker image that executes natively on the host Linux kernel with an added writable filesystem layer.
+
 **The Plain-English Analogy**:
 - A **Docker Image** is like a **cooking recipe or frozen cake** (or a Class in OOP). It is read-only, immutable, and stored on disk.
 - A **Docker Container** is the **living, running process** created from that image (an Object instance in OOP). It has an active PID in RAM and a thin writable layer on top.
@@ -124,6 +128,9 @@ stateDiagram-v2
 ---
 
 ### Q13: What is the PID 1 Problem, and how does it cause zombie processes?
+> **Book Definition**:
+> *Zombie Process*: A terminated Linux process whose execution has finished and whose resources have been freed, but whose entry remains in the OS process table until its parent process reads its exit status code via the `wait()` system call.
+
 **The Answer**:
 - In Linux, process **PID 1** (`init` or `systemd`) has two critical duties:
   1. Forwarding operating system signals (`SIGTERM`, `SIGINT`) to child processes.

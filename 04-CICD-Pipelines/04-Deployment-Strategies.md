@@ -24,10 +24,11 @@ flowchart TD
         C["4. Canary Strategy\n*The Coal Mine Canary Bird*\nSend 5% of real traffic to new version to test safety before 100% rollout"]
     end
 
-    style R fill:#fee2e2,stroke:#ef4444,stroke-width:1px
-    style RU fill:#eff6ff,stroke:#2563eb,stroke-width:2px
-    style BG fill:#dcfce7,stroke:#16a34a,stroke-width:2px
-    style C fill:#fef3c7,stroke:#d97706,stroke-width:2px
+    style Strategies fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a
+    style R fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    style RU fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style BG fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style C fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
 ```
 
 1. **Recreate (The Closed Store)**:
@@ -67,11 +68,13 @@ To grasp the necessity of modern deployment strategies, contrast them with histo
 Modern engineering organizations utilize four primary deployment strategies depending on risk tolerance and architecture:
 
 1. **Recreate Strategy**:
+   * *Book Definition*: The Recreate deployment strategy shuts down all existing application instances before provisioning new versions, eliminating version concurrency at the expense of downtime.
    * **Mechanics**: The deployment controller completely terminates and deletes all existing version 1 (`v1`) pods or server instances before spinning up any version 2 (`v2`) instances.
    * **Behavior**: Guarantees that two conflicting versions of the application never run concurrently against the database. However, users experience total service downtime during the gap between `v1` termination and `v2` startup readiness.
    * **Best For**: Non-critical development environments, offline batch processing pipelines, or legacy monolithic systems incapable of running multi-version database migrations.
 
 2. **Rolling Update Strategy (Default in Kubernetes)**:
+   * *Book Definition*: The Rolling Update strategy incrementally replaces instances of the previous application version with the new version, maintaining application availability throughout the update window.
    * **Mechanics**: The orchestrator gradually replaces old `v1` pods with new `v2` pods in a controlled, phased sequence.
    * **Configuration**: Governed in Kubernetes deployments by two crucial throttling parameters:
      * `maxSurge`: The maximum number of pods that can be created *above* the desired replica count during the update (e.g., `25%`).
@@ -80,6 +83,7 @@ Modern engineering organizations utilize four primary deployment strategies depe
    * **Trade-Off**: Provides zero downtime, but `v1` and `v2` run simultaneously side-by-side for several minutes, requiring strict backward compatibility in databases and caching layers.
 
 3. **Blue-Green (Red-Black) Deployment**:
+   * *Book Definition*: Blue-Green deployment is a release technique that utilizes two identical production environments (one active, one standby) to achieve instantaneous cutovers and rollbacks with zero downtime.
    * **Mechanics**: Two complete, identical production environments exist side-by-side. The current live version runs in the **Blue** environment, receiving 100% of user traffic through a router, load balancer, or Kubernetes Service selector.
    * **The Release Flow**: The new version is deployed entirely into the idle **Green** environment. Comprehensive end-to-end smoke tests and synthetic user journeys run against Green in isolation without affecting real users.
    * **The Cutover**: Once Green is certified 100% production-ready, the load balancer or Service selector is updated to point to Green. Traffic shifts instantaneously ($< 1$ second).
@@ -87,12 +91,14 @@ Modern engineering organizations utilize four primary deployment strategies depe
    * **Trade-Off**: Requires double the hardware footprint ($2\times$ compute resources) while both environments run.
 
 4. **Canary Deployment**:
+   * *Book Definition*: Canary deployment is a progressive delivery strategy that exposes a new software release to a small fraction of real production traffic to validate performance and stability before broad rollout.
    * **Mechanics**: Inspired by the historic practice of coal miners using canary birds to detect poisonous gases before humans were harmed. The new `v2` version is deployed alongside `v1`, but an intelligent traffic manager (such as Argo Rollouts, Istio, or Envoy) routes only a tiny fraction of live user traffic (e.g., 2% to 5%) to `v2`, keeping the remaining 95% on stable `v1`.
    * **Automated Metric Analysis**: Telemetry engines (Prometheus, Datadog) monitor golden signals on the canary pods: HTTP 5xx error rates, response latencies, and panic logs.
    * **Progressive Rollout**: If metrics remain healthy over an observation window (e.g., 15 minutes), traffic incrementally steps up: $5\% \to 25\% \to 50\% \to 100\%$.
    * **Automated Abort & Rollback**: If the error rate exceeds a pre-configured threshold (e.g., $> 0.5\%$), the canary is immediately aborted and 100% of traffic drops back to `v1`. Only 5% of users experienced the bug, protecting 95% of your customer base.
 
 5. **The Database Migration Strategy (The Expand-and-Contract Pattern)**:
+   * *Book Definition*: The Expand-and-Contract (Parallel Change) pattern is a refactoring technique that allows breaking database schema migrations to occur safely alongside concurrent multi-version application releases without downtime.
    * During Rolling Updates and Canary releases, `v1` and `v2` application pods query the exact same database simultaneously.
    * Running a breaking schema change (like dropping a column or renaming `user_name` to `full_name`) causes all running `v1` pods to immediately crash with SQL syntax or mapping exceptions!
    * The **Expand-and-Contract (Parallel Change)** pattern solves this across 4 disciplined phases:
@@ -127,7 +133,7 @@ Modern engineering organizations utilize four primary deployment strategies depe
 
 ```mermaid
 flowchart TD
-    Ingress["Service Mesh / Gateway (Istio / Envoy / Argo Rollouts)"]
+    Ingress["Service Mesh / Gateway\n(Istio / Envoy / Argo Rollouts)"]
 
     Ingress -->|95% Production Traffic| V1["Stable Version (v1.0)\n95% of active users"]
     Ingress -->|5% Experimental Traffic| V2["Canary Version (v2.0)\n5% of active users"]
@@ -138,10 +144,12 @@ flowchart TD
     Monitor -->|If Errors > 0.5%| Rollback["🚨 Automatic Rollback!\nRoute 100% traffic back to v1.0"]
     Monitor -->|If Health == 100%| Promote["✅ Progressive Promotion:\nIncrease 5% -> 25% -> 50% -> 100%"]
 
-    style V1 fill:#eff6ff,stroke:#2563eb,stroke-width:2px
-    style V2 fill:#fef3c7,stroke:#d97706,stroke-width:2px
-    style Rollback fill:#fee2e2,stroke:#ef4444,stroke-width:2px
-    style Promote fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+    style Ingress fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style V1 fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style V2 fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style Monitor fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style Rollback fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    style Promote fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
 ```
 
 ---
@@ -162,10 +170,10 @@ flowchart LR
     P2 --> P3["Phase 3: Migrate Readers\nDeploy app v2 that reads/writes exclusively to 'full_name'."]
     P3 --> P4["Phase 4: Contract\nOnce v1 is 100% decommissioned, drop legacy 'name' column."]
 
-    style P1 fill:#eff6ff,stroke:#2563eb,stroke-width:1px
-    style P2 fill:#fef3c7,stroke:#d97706,stroke-width:1px
-    style P3 fill:#dcfce7,stroke:#16a34a,stroke-width:1px
-    style P4 fill:#fee2e2,stroke:#ef4444,stroke-width:1px
+    style P1 fill:#93c5fd,stroke:#1d4ed8,stroke-width:1.5px,color:#0f172a
+    style P2 fill:#fde047,stroke:#b45309,stroke-width:1.5px,color:#0f172a
+    style P3 fill:#86efac,stroke:#15803d,stroke-width:1.5px,color:#0f172a
+    style P4 fill:#fca5a5,stroke:#dc2626,stroke-width:1.5px,color:#7f1d1d
 ```
 
 ---

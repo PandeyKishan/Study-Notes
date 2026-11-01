@@ -18,6 +18,15 @@ flowchart TD
     B <-->|Commands & Status| F[Kubelet on Worker Node]
     F -->|Creates Containers| G[Container Runtime]
     F -->|Manages Networking| H[Kube-Proxy]
+
+    style A fill:#e2e8f0,stroke:#334155,stroke-width:2px,color:#0f172a
+    style B fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style C fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
+    style D fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style E fill:#fca5a5,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    style F fill:#93c5fd,stroke:#1d4ed8,stroke-width:2px,color:#0f172a
+    style G fill:#86efac,stroke:#15803d,stroke-width:2px,color:#0f172a
+    style H fill:#fde047,stroke:#b45309,stroke-width:2px,color:#0f172a
 ```
 
 ---
@@ -130,8 +139,12 @@ sequenceDiagram
     Pod-->>Op: Status Updates
     Op->>API: Update CRD Status (Ready)
 ```
-* **CRD (Custom Resource Definition):** Extends the Kubernetes API (e.g., creating a `Database` or `Certificate` resource type).
-* **Operator:** A pod running a custom controller that watches CRDs and makes the cluster match the desired state by creating native resources (Pods, Deployments, etc.).
+* **CRD (Custom Resource Definition):**
+  - *Book Definition*: A Custom Resource Definition (CRD) is an extension mechanism that allows users to introduce custom object types into the Kubernetes API without modifying the core codebase.
+  - Extends the Kubernetes API (e.g., creating a `Database` or `Certificate` resource type).
+* **Operator:**
+  - *Book Definition*: An Operator is an application-specific controller that extends the Kubernetes API to automate the creation, configuration, and management of complex stateful applications on behalf of a human operator.
+  - A pod running a custom controller that watches CRDs and makes the cluster match the desired state by creating native resources (Pods, Deployments, etc.).
 
 ---
 
