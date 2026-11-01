@@ -65,8 +65,8 @@ Kubernetes enforces a **flat, direct-routing network model**. Every Pod in the c
 
 This flat network is established by **CNI (Container Network Interface) plugins** such as Calico, Cilium, or Flannel.
 
-### 2. What is a Kubernetes Service? (Straightforward Definition)
-> **Book Definition**: A Kubernetes Service is an abstraction which defines a logical set of Pods and a policy by which to access them, targeted via label selectors and exposed through a stable network endpoint.
+### 2. What is a Kubernetes Service?
+A **Kubernetes Service** is an abstraction which defines a logical set of Pods and a policy by which to access them, targeted via label selectors and exposed through a stable network endpoint.
 
 A **Kubernetes Service** is an abstract resource that defines a logical set of Pods and a policy by which to access them. Because Pods are ephemeral and frequently recreated with new, dynamic IP addresses, you never point clients or other services directly at a Pod's IP. 
 
@@ -74,27 +74,27 @@ Instead, you create a Service with a **label selector** (e.g., `app: order-servi
 
 ### 3. How the Four Service Types Work in Practice
 * **`ClusterIP` (Internal Only - The Default):**
-  - *Book Definition*: ClusterIP is the default Kubernetes service type that assigns an immutable internal IP address reachable exclusively within the cluster network.
+  - ClusterIP is the default Kubernetes service type that assigns an immutable internal IP address reachable exclusively within the cluster network.
   - Exposes the Service on an internal Virtual IP reachable only from *inside* the Kubernetes cluster. This is the standard choice for databases, caching layers, and private backend microservices that should never be exposed directly to the outside internet.
 * **`NodePort` (Testing & On-Premise Access):**
-  - *Book Definition*: NodePort is a service type that exposes the workload on a dedicated high-range port across every node's external IP address, facilitating direct cluster-external access.
+  - NodePort is a service type that exposes the workload on a dedicated high-range port across every node's external IP address, facilitating direct cluster-external access.
   - Opens a dedicated static port (within the range `30000–32767`) on **every single worker node** in the cluster. Any external traffic hitting `<NodeIP>:<NodePort>` is forwarded to the Service and load-balanced to backend Pods. This is primarily used for quick debugging or on-premise clusters lacking cloud load-balancer integrations.
 * **`LoadBalancer` (Cloud-Native Production):**
-  - *Book Definition*: LoadBalancer is a service type that automatically provisions an external cloud load balancer to route public internet traffic directly into the cluster service.
+  - LoadBalancer is a service type that automatically provisions an external cloud load balancer to route public internet traffic directly into the cluster service.
   - Designed for public-facing applications hosted on cloud providers (AWS, GCP, Azure). When created, Kubernetes talks to the cloud provider's API to automatically provision a managed cloud load balancer (e.g., AWS Network Load Balancer) with a public static IP address that routes external internet traffic into your cluster's services.
 * **`Headless Service` (`clusterIP: None`):**
-  - *Book Definition*: A Headless Service is a service configured with clusterIP set to None that bypasses proxy load balancing and returns direct DNS A-records pointing to individual pod IPs.
+  - A Headless Service is a service configured with clusterIP set to None that bypasses proxy load balancing and returns direct DNS A-records pointing to individual pod IPs.
   - Intentionally allocates **no Virtual IP**. Instead of load-balancing requests through `kube-proxy`, CoreDNS directly returns the individual A-records of all backing Pods. This is strictly required for stateful distributed systems like **Apache Kafka** and **Cassandra**, where client libraries must open point-to-point connections with the specific broker leading a partition.
 
 ### 4. What is an Ingress Controller? (Layer 7 Routing)
-> **Book Definition**: Ingress is an API resource that manages external Layer 7 HTTP and HTTPS access to services within a cluster, providing path-based and host-based routing, traffic load balancing, and SSL/TLS termination.
+**Ingress** is an API resource that manages external Layer 7 HTTP and HTTPS access to services within a cluster, providing path-based and host-based routing, traffic load balancing, and SSL/TLS termination.
 
 While a `LoadBalancer` Service operates at **Layer 4 (Transport / TCP)**, managing separate cloud load balancers for dozens of microservices becomes prohibitively expensive ($20–$30/month per load balancer) and cannot inspect HTTP URLs. 
 
 An **Ingress** operates at **Layer 7 (Application / HTTP & HTTPS)**. It provides a single entry point into the cluster running behind a single cloud load balancer. The **Ingress Controller** (such as NGINX Ingress, Traefik, or Envoy) acts as a smart reverse-proxy that examines incoming HTTP request paths (e.g., `/api/orders` vs. `/api/notifications`) or domain hostnames (`orders.company.com`) and routes traffic to the appropriate internal `ClusterIP` Service. It also centralizes SSL/TLS certificate termination and rate-limiting.
 
 ### 5. NetworkPolicies: Enforcing Zero-Trust Cluster Security
-> **Book Definition*: A NetworkPolicy is a security specification that governs Layer 3 and Layer 4 network communication rules between pod selectors, namespaces, and IP blocks.
+A **NetworkPolicy** is a security specification that governs Layer 3 and Layer 4 network communication rules between pod selectors, namespaces, and IP blocks.
 
 By default, Kubernetes implements an open network topology: any Pod in any namespace can communicate with any other Pod. If an attacker breaches an internet-facing frontend pod, they can freely explore internal cluster networks and connect to sensitive databases.
 

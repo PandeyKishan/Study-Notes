@@ -57,38 +57,33 @@ Kubernetes does not write custom storage drivers for every cloud vendor. Instead
 
 **How Dynamic Storage Provisioning Works:**
 * **`StorageClass`:**
-  - *Book Definition*: A StorageClass provides a way for administrators to describe the classes of storage they offer and enables dynamic provisioning of PersistentVolumes via designated provisioners.
+  - A StorageClass describes the classes of storage available in the cluster and enables dynamic provisioning of PersistentVolumes via designated provisioners.
   - The cluster administrator defines one or more StorageClasses (e.g., `gp3-sc` for AWS EBS gp3 SSDs). It declares which CSI provisioner to use and parameters like volume type and IOPS.
 * **`PersistentVolumeClaim` (PVC):**
-  - *Book Definition*: A PersistentVolumeClaim (PVC) is a user's declarative request for storage specifying size, volume mode, and access modes that binds to a matching PersistentVolume.
+  - A PersistentVolumeClaim (PVC) is a user's declarative request for storage specifying size, volume mode, and access modes that binds to a matching PersistentVolume.
   - When a developer deploys a database, they submit a PVC requesting specific capacity (e.g., `50Gi`) and an access mode (`ReadWriteOnce`).
 * **Dynamic Provisioning (`PersistentVolume` / PV):**
-  - *Book Definition*: A PersistentVolume (PV) is an administrator-provisioned or dynamically created piece of networked storage in the cluster whose lifecycle is independent of any individual pod.
+  - A PersistentVolume (PV) is an administrator-provisioned or dynamically created piece of networked storage in the cluster whose lifecycle is independent of any individual pod.
   - The Kubernetes volume controller detects the PVC, calls the CSI driver, provisions the physical 50GB disk in the cloud, creates a **`PersistentVolume` (PV)** object representing that disk in the cluster, and binds the PVC to the PV. When the Pod starts, Kubernetes attaches the cloud disk to the worker node and mounts it directly into the container's designated folder (`/var/lib/postgresql/data`).
 
 ### 2. Externalizing Application Configuration: ConfigMaps vs. Secrets
 Under the Twelve-Factor App methodology, code and configuration must be strictly separated. If you bake database hostnames, API endpoints, or credentials into a Docker image, changing a single configuration parameter requires rebuilding and redeploying the entire container image.
 
 **ConfigMaps (For Non-Sensitive Data):**
-- *Book Definition*: A ConfigMap is an API object used to store non-confidential configuration data in key-value pairs that can be consumed by pods as environment variables, command-line arguments, or volume files.
-- A **ConfigMap** stores clear-text configuration parameters as key-value pairs (e.g., `DATABASE_URL=postgres-svc:5432` or `LOG_LEVEL=INFO`). ConfigMaps can be injected into Pods as individual environment variables, as command-line arguments, or mounted as configuration files inside a volume (e.g., mounting an `application.yml` file into `/config`). When you update a mounted ConfigMap, Kubernetes updates the file inside the container dynamically without restarting the Pod.
+- A **ConfigMap** is an API object used to store non-confidential configuration data in key-value pairs that can be consumed by pods as environment variables, command-line arguments, or volume files. It stores clear-text configuration parameters (e.g., `DATABASE_URL=postgres-svc:5432` or `LOG_LEVEL=INFO`). ConfigMaps can be injected into Pods as individual environment variables, as command-line arguments, or mounted as configuration files inside a volume (e.g., mounting an `application.yml` file into `/config`). When you update a mounted ConfigMap, Kubernetes updates the file inside the container dynamically without restarting the Pod.
 
 **Secrets (For Sensitive Data):**
-- *Book Definition*: A Secret is an API object intended to hold a small amount of sensitive data such as passwords, tokens, or keys to prevent accidental exposure in application code or images.
-- A **Secret** stores confidential information such as passwords, API tokens, OAuth keys, and TLS certificates. Secrets are injected similarly to ConfigMaps (as environment variables or mounted files), but with a critical security difference: mounted Secrets are backed by the host's in-memory RAM filesystem (`tmpfs`), ensuring that sensitive credentials are never written to physical disk.
+- A **Secret** is an API object intended to hold a small amount of sensitive data such as passwords, tokens, or keys to prevent accidental exposure in application code or images. It stores confidential credentials (OAuth keys, TLS certificates) injected similarly to ConfigMaps, backed by the host's in-memory RAM filesystem (`tmpfs`) to ensure credentials are never written to physical disk.
 
 *The Base64 Reality Check:* By default, Secrets stored in `etcd` are only **Base64-encoded**, which offers zero cryptographic protection. In enterprise production, clusters must enable **KMS Envelope Encryption** (where the `kube-apiserver` encrypts secrets with keys managed by AWS KMS or HashiCorp Vault before saving them to `etcd`).
 
 ### 3. Securing the Cluster: Role-Based Access Control (RBAC)
 Kubernetes exposes a massive REST API. Without access control, any user or compromised container could query secrets, delete deployments, or take over the cluster. **RBAC** enforces fine-grained authorization using four core primitives:
 * **The "What" (Permissions):**
-  - *Book Definition (Role)*: A Role contains rules that represent a set of permissions scoped strictly within a single specific Kubernetes namespace.
-  - *Book Definition (ClusterRole)*: A ClusterRole is a non-namespaced resource that defines permissions across the entire cluster, covering cluster-scoped resources as well as namespaced resources cluster-wide.
-  - A **`Role`** defines allowed actions within a specific namespace (e.g., permission to `get`, `list`, and `watch` pods in the `development` namespace). A **`ClusterRole`** defines permissions that apply cluster-wide (e.g., managing Nodes, PersistentVolumes, or reading pods across all namespaces).
+  - A **`Role`** defines allowed actions scoped strictly within a single specific namespace (e.g., permission to `get`, `list`, and `watch` pods in the `development` namespace). A **`ClusterRole`** is a non-namespaced resource that defines permissions across the entire cluster (e.g., managing Nodes, PersistentVolumes, or reading pods across all namespaces).
 * **The "Who" (Subjects):** The entity requesting access—a human user, a developer group, or a **`ServiceAccount`** used by an automated pod or CI/CD runner.
 * **The "Glue" (Bindings):**
-  - *Book Definition (RoleBinding)*: A RoleBinding grants the permissions defined in a Role to a user, group, or service account within a specific namespace.
-  - A **`RoleBinding`** attaches a Role to a Subject within a single namespace. A **`ClusterRoleBinding`** grants cluster-wide privileges to a Subject. Following the **Principle of Least Privilege**, engineers and applications should only receive the minimum permissions necessary to perform their work.
+  - A **`RoleBinding`** attaches a Role to a Subject within a single namespace, while a **`ClusterRoleBinding`** grants cluster-wide privileges to a Subject. Following the **Principle of Least Privilege**, engineers and applications should only receive the minimum permissions necessary to perform their work.
 
 ---
 

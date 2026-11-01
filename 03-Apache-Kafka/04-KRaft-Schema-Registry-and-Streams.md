@@ -77,24 +77,24 @@ sequenceDiagram
 
 ## 📖 1. Comprehensive Study Notes: Understanding KRaft, Schema Registry & Stream Processing from the Ground Up
 
-### What are KRaft, Schema Registry, and Stream Processing? (Straightforward Definitions & Context)
+### What are KRaft, Schema Registry, and Stream Processing?
 Modern Kafka production systems rely on three foundational pillars that extend basic pub/sub messaging into an enterprise-grade streaming platform:
 
 1. **KRaft (Kafka Raft Consensus Mode)**:
-   * *Book Definition*: KRaft (Kafka Raft Metadata mode) is Kafka's native distributed consensus protocol that manages cluster metadata directly within the brokers via an internal Raft quorum, eliminating the external dependency on ZooKeeper.
+   * **KRaft (Kafka Raft Metadata mode)**: Kafka's native distributed consensus protocol that manages cluster metadata directly within the brokers via an internal Raft quorum, eliminating the external dependency on ZooKeeper.
    * **Historical Context**: For over a decade (Kafka versions 0.8 through 2.8), Kafka required running two entirely separate distributed clusters: an Apache ZooKeeper quorum and a Kafka broker cluster. ZooKeeper stored cluster metadata, managed broker registrations, and orchestrated controller elections. Under KRaft (introduced in KIP-500 and production-ready in Kafka 3.3+), Kafka brokers self-govern using an internal implementation of the Raft consensus algorithm.
 
 2. **Schema Registry**:
-   * *Book Definition*: Schema Registry is a centralized service that serves as a shared repository and validation authority for schemas, ensuring message format compatibility across distributed producers and consumers.
+   * **Schema Registry**: A centralized service that serves as a shared repository and validation authority for schemas, ensuring message format compatibility across distributed producers and consumers.
    * **Context**: In decoupled microservice architectures, different engineering teams independently write producers and consumers across multiple programming languages (Java, Go, Python, Node.js). Schema Registry enforces strict data schemas (using formats such as Apache Avro, Protocol Buffers, or JSON Schema) so producers cannot publish malformed payloads that crash downstream consumers.
 
 3. **Log Compaction**:
-   * *Book Definition*: Log Compaction is a retention mechanism in Kafka that retains at least the most recent message value for each key within a partition commit log indefinitely.
+   * **Log Compaction**: A retention mechanism in Kafka that retains at least the most recent message value for each key within a partition commit log indefinitely.
    * An alternative Kafka storage retention strategy (`cleanup.policy = compact`) that guarantees Kafka will retain at least the latest value for every unique message key within a topic partition indefinitely, rather than discarding records purely based on age or size.
 
 4. **Kafka Connect & Kafka Streams**:
-   * *Book Definition (Kafka Connect)*: Kafka Connect is a framework for scalable and resilient streaming data integration between Apache Kafka and external data storage systems.
-   * *Book Definition (Kafka Streams)*: Kafka Streams is a client library for building real-time stream processing applications and microservices whose input and output data are stored in Kafka topics.
+   * **Kafka Connect**: A framework for scalable and resilient streaming data integration between Apache Kafka and external data storage systems.
+   * **Kafka Streams**: A client library for building real-time stream processing applications and microservices whose input and output data are stored in Kafka topics.
    * **Kafka Connect**: A distributed, fault-tolerant integration framework for moving high-volume data between Kafka and external datastores (such as PostgreSQL, MySQL, Elasticsearch, Snowflake, and AWS S3) without writing custom producer or consumer code.
    * **Kafka Streams**: A lightweight, embeddable client library for Java and Kotlin that allows applications to process, filter, join, and aggregate event streams in real time with stateful local storage (RocksDB).
 
@@ -193,7 +193,7 @@ flowchart LR
 ```
 
 > **The Tombstone Record**:
-> *Book Definition*: A Tombstone is a record published with a non-null key and a null payload that explicitly marks that key for deletion in a compacted topic.
+> **The Tombstone Record**: A tombstone is a record published with a non-null key and a null payload that explicitly marks that key for deletion in a compacted topic.
 > To completely delete a key from a compacted topic, a producer writes a record with that key and a `null` value. The compactor retains the tombstone for `delete.retention.ms` before permanently scrubbing the key from disk.
 
 ---

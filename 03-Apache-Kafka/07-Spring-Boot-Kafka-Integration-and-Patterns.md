@@ -72,12 +72,8 @@ flowchart TD
 ```
 
 ### Key Abstractions:
-- **`KafkaTemplate`**:
-  - *Book Definition*: KafkaTemplate is a high-level, thread-safe Spring abstraction that wraps an Apache Kafka Producer to execute asynchronous message publication via CompletableFutures.
-  - A thread-safe, high-level wrapper for producing messages. It handles connection pooling, metric collection, and serialization natively.
-- **`@KafkaListener`**:
-  - *Book Definition*: @KafkaListener is a Spring annotation used to declare a managed method endpoint that automatically consumes and deserializes messages from designated Kafka topics.
-  - The annotation marking methods that receive incoming messages.
+- **`KafkaTemplate`**: A thread-safe, high-level Spring wrapper that wraps an Apache Kafka Producer to execute asynchronous message publication via CompletableFutures. It handles connection pooling, metric collection, and serialization natively.
+- **`@KafkaListener`**: A Spring annotation used to declare a managed method endpoint that automatically consumes and deserializes messages from designated Kafka topics. It marks methods that receive incoming messages.
 - **`MessageListenerContainer`**: The backbone of `@KafkaListener`. It manages consumer threads, offset commits, partition rebalances, and polling loops continuously in the background.
 - **`ConcurrentKafkaListenerContainerFactory`**: Factory to create container instances. You configure consumer properties (like concurrency, error handlers, and message converters) here.
 
@@ -179,7 +175,7 @@ Spring can orchestrate a 1.5 Phase Commit by linking the DB Transaction and Kafk
 If the DB commit fails, the Kafka transaction is aborted. Consumers must use `isolation.level=read_committed`.
 
 ### Solution 2: The Transactional Outbox Pattern (Enterprise Grade)
-> **Book Definition**: The Transactional Outbox Pattern is a distributed data pattern that ensures reliable event publishing by persisting business domain changes and corresponding event records within a single database ACID transaction prior to asynchronous message relay.
+> **Transactional Outbox Pattern**: A distributed data pattern that ensures reliable event publishing by persisting business domain changes and corresponding event records within a single database ACID transaction prior to asynchronous message relay.
 
 Instead of dual-writing, you write the business entity AND an "Outbox Event" to the DB in a **single ACID transaction**. A separate background process (like Debezium CDC or a Spring `@Scheduled` poller) reads the Outbox table and publishes to Kafka.
 

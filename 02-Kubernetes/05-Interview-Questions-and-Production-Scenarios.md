@@ -31,7 +31,7 @@ flowchart TD
 ## 2. Advanced Debugging Scenarios
 
 ### 2.1 Deep Dive: Debugging `OOMKilled` (Exit Code 137)
-> **Book Definition**: OOMKilled (Exit Code 137) is an operating system kernel event where a container process is terminated via SIGKILL for attempting to allocate more memory than permitted by its cgroup memory limit.
+> **OOMKilled (Exit Code 137)**: An operating system kernel event where a container process is terminated via SIGKILL for attempting to allocate more memory than permitted by its cgroup memory limit.
 
 While standard answers cite `resources.limits.memory`, Staff-level debugging requires understanding Linux cgroups and memory types.
 - **cgroups v1 vs v2**: Kubernetes uses cgroups to restrict resource usage. In cgroups v1, the kernel tracks total memory as `RSS (Resident Set Size) + Page Cache`. If your application writes large files, the Page Cache grows. If `RSS + Cache` hits the limit, the kernel tries to reclaim cache. If it can't reclaim fast enough, the OOM Killer is invoked!
@@ -39,7 +39,7 @@ While standard answers cite `resources.limits.memory`, Staff-level debugging req
 - **Java/JVM**: Ensure `MaxRAMPercentage` is set so the JVM respects cgroup limits, rather than host memory.
 
 ### 2.2 Deep Dive: Debugging `CrashLoopBackOff`
-> **Book Definition**: CrashLoopBackOff is a Kubernetes state indicating that a pod is repeatedly starting, failing, and restarting with an exponentially increasing backoff delay.
+> **CrashLoopBackOff**: A Kubernetes state indicating that a pod is repeatedly starting, failing, and restarting with an exponentially increasing backoff delay.
 
 A container exits prematurely. Standard debugging uses `kubectl logs -p`. Advanced techniques include:
 - **Ephemeral Containers**: Since 1.23, you can use `kubectl debug -it <pod> --image=busybox` to attach a debugging container to a crashing pod's namespace. This allows network tests (`curl`, `nslookup`) and filesystem inspection without restarting the pod.

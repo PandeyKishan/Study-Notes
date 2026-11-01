@@ -54,7 +54,7 @@ flowchart TD
 
 ## 📖 1. Comprehensive Study Notes: Understanding GitHub Actions from the Ground Up
 
-### What is GitHub Actions? (Straightforward Definition & Context)
+### What is GitHub Actions?
 **GitHub Actions** is GitHub's native continuous integration, continuous delivery (CI/CD), and workflow automation platform. It empowers software teams to automate every phase of their software engineering lifecycle—from code linting and testing to security scanning, container packaging, and cloud deployment—directly within the GitHub repository.
 
 Before the introduction of GitHub Actions, engineering organizations were forced to provision, operate, and maintain external automation tools such as Jenkins, TeamCity, or Bamboo:
@@ -68,22 +68,16 @@ To effectively build and troubleshoot automated pipelines, developers must under
 
 1. **The Structural Hierarchy (Workflows $\to$ Events $\to$ Jobs $\to$ Steps $\to$ Actions)**:
    * **Workflow**:
-     - *Book Definition*: A Workflow is a configurable automated process defined in a YAML file that executes one or more jobs when triggered by an event.
      - A configurable automated process stored in `.github/workflows/*.yml`. A repository can contain multiple workflows (e.g., `ci.yml` for testing PRs, `release.yml` for publishing container images, and `security-scan.yml` for nightly vulnerability audits).
    * **Event (`on:`)**:
-     - *Book Definition*: An Event is a specific activity in a repository (such as a pull request, code commit, or schedule) that automatically triggers a workflow execution.
      - A specific trigger that instructs GitHub to execute a workflow. Triggers include code events (`push`, `pull_request`), schedules (POSIX cron expressions), external webhooks (`repository_dispatch`), or manual triggers (`workflow_dispatch`).
    * **Job**:
-     - *Book Definition*: A Job is a collection of steps in a workflow that executes sequentially on the same runner instance.
      - A set of sequential steps executed on an assigned compute instance. By default, **all jobs within a workflow run in parallel**. When sequential execution is required, you declare dependencies using the `needs: [job_name]` keyword to construct a Directed Acyclic Graph (DAG).
    * **Runner**:
-     - *Book Definition*: A Runner is an application and compute environment (hosted virtual machine or container) that executes the jobs defined in a GitHub Actions workflow.
      - The physical or virtual machine that hosts and executes a job. GitHub provides **GitHub-hosted Runners** (pre-configured, ephemeral Ubuntu, Windows, and macOS virtual machines that are created on-demand and destroyed immediately upon job completion) and **Self-Hosted Runners** (custom virtual machines or Kubernetes pods running inside your private VPC for access to internal databases or specialized hardware).
    * **Step**:
-     - *Book Definition*: A Step is an individual task within a job that can run commands or invoke reusable actions sharing the runner's filesystem.
      - An individual task executed sequentially inside a job. Steps within the same job share the runner's local filesystem and environment variables. Steps can either execute raw shell scripts (`run: mvn clean test`) or invoke pre-built actions (`uses: actions/checkout@v4`).
    * **Action**:
-     - *Book Definition*: An Action is a reusable, standalone extension or script that performs a complex, frequently repeated task in a GitHub Actions workflow.
      - A standalone, reusable automation module (like a pre-packaged function) published to the GitHub Marketplace or referenced directly from public repositories.
 
 2. **Isolation & Inter-Job Communication**:
@@ -95,7 +89,7 @@ To effectively build and troubleshoot automated pipelines, developers must under
    * The `concurrency` block with `cancel-in-progress: true` automatically cancels older, superseded workflow runs on that branch, dedicating runner capacity strictly to the latest commit.
 
 4. **Modern Secretless Cloud Authentication via OpenID Connect (OIDC)**:
-   * *Book Definition (OIDC)*: OpenID Connect (OIDC) is an identity federation protocol that allows GitHub Actions workflows to access cloud resources securely using short-lived cryptographically signed tokens instead of static credentials.
+   * OpenID Connect (OIDC) is an identity federation protocol that allows GitHub Actions workflows to access cloud resources securely using short-lived cryptographically signed tokens instead of static credentials.
    * Rather than storing permanent cloud access keys (e.g., `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`) in GitHub repository secrets, production pipelines use **OIDC Federation**.
    * During job execution, the runner requests a short-lived, cryptographically signed JSON Web Token (JWT) from GitHub's OIDC Token Provider.
    * The runner presents this token to the cloud provider (AWS STS, Google Cloud Workload Identity, or Azure AD). The cloud provider verifies the token signature and claims (repository path, branch, environment) and returns temporary, scoped credentials that automatically expire in 15 minutes.

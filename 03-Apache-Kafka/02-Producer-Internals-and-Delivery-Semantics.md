@@ -52,13 +52,12 @@ flowchart LR
 
 ## 📝 1. Comprehensive Study Notes: Producer Mechanics, Delivery Guarantees & Zero Data Loss
 
-### What is a Kafka Producer? (Straightforward Definition)
+### What is a Kafka Producer?
 A **Kafka Producer** is a client application or library responsible for publishing data into Apache Kafka topics. It serializes application objects into raw byte streams, assigns them to appropriate topic partitions, groups them into compressed batches, and transmits them over persistent TCP connections to Kafka partition leader brokers.
 
 Publishing to Kafka is fundamentally asynchronous and decoupled. When an application calls `producer.send()`, the thread does not block waiting for the message to travel across the network and reach disk; instead, the record is placed into an internal high-speed memory buffer, and a future/callback is returned immediately.
 
 ### What Happens Behind the Scenes During `producer.send()`?
-> **Book Definitions**:
 > - *ProducerRecord*: A ProducerRecord is an object representing an individual key-value pair, target topic, optional partition number, timestamp, and metadata headers to be published to Kafka.
 > - *RecordAccumulator*: The RecordAccumulator is an in-memory client buffer pool that groups newly produced records into batches segmented by topic-partition to optimize network I/O throughput.
 > - *batch.size*: batch.size is a producer configuration setting that defines the maximum memory threshold in bytes allocated for batching records destined for a single partition.

@@ -122,19 +122,19 @@ flowchart TD
 
 ### Docker Network Drivers Explained:
 1. **Bridge (Default)**:
-   - *Book Definition*: A software-based network switch managed by Docker that allows containers connected to the same bridge network to communicate while providing isolation from external networks.
+   - Provides a software-based network switch managed by Docker that allows containers connected to the same bridge network to communicate while providing isolation from external networks.
    - Creates a virtual private software bridge inside the host.
    - Containers get private IPs (e.g., `172.18.0.x`).
    - *CRITICAL INTERVIEW FACT*: The **default bridge** (`docker0`) does **not** provide automatic DNS name resolution. You **must** create a **user-defined bridge network** (`docker network create my-net`) to get automatic DNS resolution!
 2. **Host Network (`--network host`)**:
-   - *Book Definition*: A network driver that bypasses network namespace isolation, allowing a container to attach directly to the host machine's physical network interfaces and port space.
+   - Bypasses network namespace isolation, allowing a container to attach directly to the host machine's physical network interfaces and port space.
    - Skips network isolation entirely. The container binds directly to the host's network interfaces.
    - Offers maximum performance (zero NAT overhead), but port conflicts can occur.
 3. **None (`--network none`)**:
-   - *Book Definition*: A driver that provisions only an internal loopback interface, completely disabling all external and inter-container network I/O for security isolation.
+   - Provisions only an internal loopback interface, completely disabling all external and inter-container network I/O for security isolation.
    - Completely air-gapped with no network access except local loopback. Used for secure offline batch jobs.
 4. **Overlay Network**:
-   - *Book Definition*: A distributed multi-host network driver using VXLAN tunneling to encapsulate packet frames across multiple physical or cloud hosts.
+   - A distributed multi-host network driver using VXLAN tunneling to encapsulate packet frames across multiple physical or cloud hosts.
    - Connects multiple Docker daemons across different physical machines (used in Docker Swarm and Kubernetes).
 
 ---
@@ -173,16 +173,16 @@ flowchart LR
 
 | Type | How It Works | Best Use Case | Command Example |
 | :--- | :--- | :--- | :--- |
-| **Named Volume** | *Book Definition: A persistent storage directory managed entirely by the Docker daemon at `/var/lib/docker/volumes/`, isolated from host directory changes.* High performance, completely independent of host directory structure. | **Production Databases (PostgreSQL, MySQL, MongoDB), Kafka logs.** | `docker run -v pg_data:/var/lib/postgresql/data postgres:15` |
-| **Bind Mount** | *Book Definition: A direct filesystem mapping that mounts a file or directory from the host machine directly into a container path, mirroring host permissions.* Directly mounts an exact file or folder from your computer into the container. | **Local Development**: Mount your local source code into the container so you can edit code and see hot-reloading without rebuilding images! | `docker run -v $(pwd)/src:/app/src node:20` |
-| **`tmpfs` Mount** | *Book Definition: A volatile storage mount located entirely within host system RAM that never commits data to underlying disk storage.* Stores data purely in the host machine's RAM memory. Never writes to disk. | **Sensitive tokens, passwords, private keys** that must vanish the second the container stops. | `docker run --tmpfs /tmp/secrets my-app` |
+| **Named Volume** | Docker creates and manages a folder inside `/var/lib/docker/volumes/`. High performance, completely independent of host directory structure and isolated from host directory changes. | **Production Databases (PostgreSQL, MySQL, MongoDB), Kafka logs.** | `docker run -v pg_data:/var/lib/postgresql/data postgres:15` |
+| **Bind Mount** | Directly mounts an exact file or folder from your computer into the container, mirroring host permissions. | **Local Development**: Mount your local source code into the container so you can edit code and see hot-reloading without rebuilding images! | `docker run -v $(pwd)/src:/app/src node:20` |
+| **`tmpfs` Mount** | Stores data purely in the host machine's RAM memory as volatile storage. Never writes to disk. | **Sensitive tokens, passwords, private keys** that must vanish the second the container stops. | `docker run --tmpfs /tmp/secrets my-app` |
 
 ---
 
 ## 🎼 5. Docker Compose: The Conductor of Multi-Container Apps
 
 ### What is Docker Compose?
-*Book Definition*: **Docker Compose** is a declarative orchestration tool for defining, configuring, and executing multi-container Docker applications using structured YAML configuration files.
+**Docker Compose** is a tool for defining and running multi-container Docker applications using a single declarative YAML file (`compose.yaml` or `docker-compose.yml`).
 
 ### Production-Ready Example: Frontend + Spring Boot Backend + PostgreSQL + Kafka
 *(Aligned with our Hands-On Capstone Project)*

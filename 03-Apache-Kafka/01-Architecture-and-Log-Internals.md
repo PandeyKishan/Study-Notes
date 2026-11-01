@@ -90,7 +90,7 @@ Many beginners ask: *"Isn't Kafka just another message queue like RabbitMQ or Ac
 
 ## 📝 1. Comprehensive Study Notes: Understanding Apache Kafka from the Ground Up
 
-### What is Apache Kafka? (Straightforward Definition)
+### What is Apache Kafka?
 **Apache Kafka** is an open-source, distributed event store and stream-processing platform designed to handle massive volumes of real-time data with extremely low latency. Originally developed at **LinkedIn** in 2011 to track user interactions and internal service metrics, Kafka was open-sourced under the Apache Software Foundation and is now used by over 80% of Fortune 100 enterprises.
 
 Unlike traditional relational databases that store the *current state* of a system (e.g., "Account Balance: $100"), Kafka acts as an **immutable, append-only distributed commit log** that records the *stream of events* that led to that state (e.g., "Deposited $50", "Transferred $20", "Deposited $70"). Every event is written in chronological order, assigned an incremental sequence number, and stored durably across multiple servers.
@@ -113,27 +113,13 @@ Modern distributed systems adopt Kafka because synchronous point-to-point commun
 
 ## 📖 2. Core Vocabulary (Plain-English Definitions)
 
-- **Event / Record**:
-  - *Book Definition*: An event (or record) is an immutable unit of data in Kafka consisting of a timestamp, optional key, payload value, and optional metadata headers.
-  - A piece of data recording something that happened in the business domain.
-- **Producer**:
-  - *Book Definition*: A producer is a client application that publishes (writes) streams of event records into Kafka topics.
-  - The application that creates and sends events to Kafka.
-- **Consumer**:
-  - *Book Definition*: A consumer is a client application that subscribes to one or more Kafka topics to read and process published event records.
-  - The application that reads and processes events from Kafka.
-- **Broker**:
-  - *Book Definition*: A broker is a standalone Kafka server node that receives, stores, serves, and replicates event logs within a cluster.
-  - A single Kafka server. A Kafka cluster is a group of brokers working together.
-- **Topic**:
-  - *Book Definition*: A topic is a logical channel or category to which event records are published and from which consumers read.
-  - A named channel or category where records are published (e.g., `orders`, `user-signups`).
-- **Partition**:
-  - *Book Definition*: A partition is an ordered, immutable, append-only commit log sequence that acts as the basic unit of parallelism and storage distribution for a Kafka topic.
-  - Topics are split into **Partitions** (shards) for horizontal scalability and parallel processing.
-- **Offset**:
-  - *Book Definition*: An offset is a monotonically increasing 64-bit integer assigned to every message within a partition that uniquely identifies its sequential position in the commit log.
-  - A unique sequential integer assigned to each record within a partition. It acts as a **bookmark** indicating which message a consumer has read up to.
+- **Event / Record**: An immutable unit of data in Kafka recording something that happened in the business domain (Key, Value, Timestamp, Headers).
+- **Producer**: The client application that creates, publishes, and sends event records to Kafka topics.
+- **Consumer**: The client application that subscribes to one or more Kafka topics to read and process published event records.
+- **Broker**: A single Kafka server node that receives, stores, serves, and replicates event logs within a cluster.
+- **Topic**: A named logical channel or category where records are published and from which consumers read (e.g., `orders`, `user-signups`).
+- **Partition**: Topics are split into **Partitions** (ordered, immutable, append-only commit log sequences) for horizontal scalability and parallel processing.
+- **Offset**: A unique sequential, monotonically increasing 64-bit integer assigned to each record within a partition. It acts as a **bookmark** indicating which message a consumer has read up to.
 
 ```mermaid
 flowchart TD
@@ -215,8 +201,7 @@ sequenceDiagram
 
 By using the Linux `sendfile()` system call, Kafka bypasses user space entirely. Data moves directly from the OS Page Cache to the Network Card, reducing CPU load to near zero!
 
-> **Book Definition**:
-> *Zero-Copy*: A Linux kernel data-transfer optimization utilizing the `sendfile()` system call that transfers data directly from OS page cache memory buffers to the network interface card without performing redundant CPU copies into application user space.
+> **Zero-Copy**: A Linux kernel data-transfer optimization utilizing the `sendfile()` system call that transfers data directly from OS page cache memory buffers to the network interface card without performing redundant CPU copies into application user space.
 
 ---
 
@@ -244,12 +229,9 @@ flowchart TD
 ```
 
 ### The Three Critical Acronyms:
-1. **LEO (Log End Offset)**:
-   - *Book Definition*: Log End Offset (LEO) is the offset of the next record to be written into a partition log on a specific broker replica.
-2. **ISR (In-Sync Replicas)**:
-   - *Book Definition*: In-Sync Replicas (ISR) is the dynamic subset of partition replicas that are actively caught up with the partition leader within the configured replica lag time threshold (`replica.lag.time.max.ms`).
-3. **HW (High Watermark)**:
-   - *Book Definition*: The High Watermark (HW) is the highest offset in a partition that has been successfully replicated across all members of the ISR, establishing the boundary of messages visible to consumers.
+1. **LEO (Log End Offset)**: The offset of the next message to be written into a partition log on a specific broker replica.
+2. **ISR (In-Sync Replicas)**: The set of broker replicas that are actively caught up with the leader within the configured replica lag time threshold (`replica.lag.time.max.ms`).
+3. **HW (High Watermark)**: The highest offset that has been replicated to **all members of the ISR**, establishing the boundary of messages visible to consumers.
    > **The Visibility Guarantee**: Consumers can **only read up to the High Watermark**. Uncommitted messages past the HW are invisible to consumers. If the leader broker dies, the new leader is guaranteed to have all committed messages!
 
 ---

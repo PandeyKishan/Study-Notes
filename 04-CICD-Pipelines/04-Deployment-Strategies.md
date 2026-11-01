@@ -55,7 +55,7 @@ flowchart TD
 
 ## 📖 1. Comprehensive Study Notes: Understanding Deployment Strategies from the Ground Up
 
-### What are Deployment Strategies? (Straightforward Definition & Context)
+### What are Deployment Strategies?
 A **Deployment Strategy** is an operational methodology used to upgrade a software service from an existing version to a new version in a live target environment (such as Kubernetes clusters, virtual machines, or serverless infrastructure) while systematically controlling downtime, risk, hardware resource cost, and user experience.
 
 To grasp the necessity of modern deployment strategies, contrast them with historical release practices:
@@ -68,13 +68,11 @@ To grasp the necessity of modern deployment strategies, contrast them with histo
 Modern engineering organizations utilize four primary deployment strategies depending on risk tolerance and architecture:
 
 1. **Recreate Strategy**:
-   * *Book Definition*: The Recreate deployment strategy shuts down all existing application instances before provisioning new versions, eliminating version concurrency at the expense of downtime.
    * **Mechanics**: The deployment controller completely terminates and deletes all existing version 1 (`v1`) pods or server instances before spinning up any version 2 (`v2`) instances.
    * **Behavior**: Guarantees that two conflicting versions of the application never run concurrently against the database. However, users experience total service downtime during the gap between `v1` termination and `v2` startup readiness.
    * **Best For**: Non-critical development environments, offline batch processing pipelines, or legacy monolithic systems incapable of running multi-version database migrations.
 
 2. **Rolling Update Strategy (Default in Kubernetes)**:
-   * *Book Definition*: The Rolling Update strategy incrementally replaces instances of the previous application version with the new version, maintaining application availability throughout the update window.
    * **Mechanics**: The orchestrator gradually replaces old `v1` pods with new `v2` pods in a controlled, phased sequence.
    * **Configuration**: Governed in Kubernetes deployments by two crucial throttling parameters:
      * `maxSurge`: The maximum number of pods that can be created *above* the desired replica count during the update (e.g., `25%`).
@@ -83,7 +81,6 @@ Modern engineering organizations utilize four primary deployment strategies depe
    * **Trade-Off**: Provides zero downtime, but `v1` and `v2` run simultaneously side-by-side for several minutes, requiring strict backward compatibility in databases and caching layers.
 
 3. **Blue-Green (Red-Black) Deployment**:
-   * *Book Definition*: Blue-Green deployment is a release technique that utilizes two identical production environments (one active, one standby) to achieve instantaneous cutovers and rollbacks with zero downtime.
    * **Mechanics**: Two complete, identical production environments exist side-by-side. The current live version runs in the **Blue** environment, receiving 100% of user traffic through a router, load balancer, or Kubernetes Service selector.
    * **The Release Flow**: The new version is deployed entirely into the idle **Green** environment. Comprehensive end-to-end smoke tests and synthetic user journeys run against Green in isolation without affecting real users.
    * **The Cutover**: Once Green is certified 100% production-ready, the load balancer or Service selector is updated to point to Green. Traffic shifts instantaneously ($< 1$ second).
@@ -91,14 +88,12 @@ Modern engineering organizations utilize four primary deployment strategies depe
    * **Trade-Off**: Requires double the hardware footprint ($2\times$ compute resources) while both environments run.
 
 4. **Canary Deployment**:
-   * *Book Definition*: Canary deployment is a progressive delivery strategy that exposes a new software release to a small fraction of real production traffic to validate performance and stability before broad rollout.
    * **Mechanics**: Inspired by the historic practice of coal miners using canary birds to detect poisonous gases before humans were harmed. The new `v2` version is deployed alongside `v1`, but an intelligent traffic manager (such as Argo Rollouts, Istio, or Envoy) routes only a tiny fraction of live user traffic (e.g., 2% to 5%) to `v2`, keeping the remaining 95% on stable `v1`.
    * **Automated Metric Analysis**: Telemetry engines (Prometheus, Datadog) monitor golden signals on the canary pods: HTTP 5xx error rates, response latencies, and panic logs.
    * **Progressive Rollout**: If metrics remain healthy over an observation window (e.g., 15 minutes), traffic incrementally steps up: $5\% \to 25\% \to 50\% \to 100\%$.
    * **Automated Abort & Rollback**: If the error rate exceeds a pre-configured threshold (e.g., $> 0.5\%$), the canary is immediately aborted and 100% of traffic drops back to `v1`. Only 5% of users experienced the bug, protecting 95% of your customer base.
 
 5. **The Database Migration Strategy (The Expand-and-Contract Pattern)**:
-   * *Book Definition*: The Expand-and-Contract (Parallel Change) pattern is a refactoring technique that allows breaking database schema migrations to occur safely alongside concurrent multi-version application releases without downtime.
    * During Rolling Updates and Canary releases, `v1` and `v2` application pods query the exact same database simultaneously.
    * Running a breaking schema change (like dropping a column or renaming `user_name` to `full_name`) causes all running `v1` pods to immediately crash with SQL syntax or mapping exceptions!
    * The **Expand-and-Contract (Parallel Change)** pattern solves this across 4 disciplined phases:

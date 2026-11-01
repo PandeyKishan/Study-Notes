@@ -61,23 +61,23 @@ flowchart LR
 
 ## 📖 1. Comprehensive Study Notes: Understanding CI/CD, GitOps & Pipeline Design from the Ground Up
 
-### What is CI/CD & GitOps? (Straightforward Definitions & Context)
+### What is CI/CD & GitOps?
 Modern cloud-native engineering relies on automated delivery pipelines and declarative operations to ship software safely and reliably:
 
 1. **Continuous Integration (CI)**:
-   * *Book Definition*: Continuous Integration (CI) is a software development practice where developers regularly merge code changes into a central repository, triggering automated builds and tests to rapidly identify defects.
+   * **Definition**: Continuous Integration is an engineering discipline where software developers frequently merge code changes into a shared central repository (typically multiple times per day). Each commit triggers an automated build and test pipeline that validates the new code within minutes.
    * **Core Purpose**: Each merge triggers an automated pipeline that compiles the code, executes automated linters and unit tests, and validates that the new code integrates cleanly without breaking existing functionality. CI eliminates the dreaded "integration hell" where multiple teams attempt to merge diverging feature branches after months of isolated work.
 
 2. **Continuous Delivery (CD)**:
-   * *Book Definition*: Continuous Delivery is a software engineering approach in which teams produce software in short cycles, ensuring that the software can be reliably released to production at any time through automated quality gates subject to manual deployment authorization.
+   * **Definition**: An automated delivery practice where code that successfully passes all CI stages is automatically packaged, tested against integration environments, and prepared for deployment to production. The software is kept in an *always-deployable state*.
    * **The Defining Attribute**: In Continuous Delivery, **every build is inherently release-ready**, but the actual deployment to the production environment requires a deliberate human business decision (such as an authorized release manager clicking an "Approve Release" button in a portal).
 
 3. **Continuous Deployment (CD)**:
-   * *Book Definition*: Continuous Deployment is an automated software delivery process in which every code change that passes all stages of the production pipeline is released directly into live production without human intervention.
+   * **Definition**: The complete, end-to-end automation of the software release lifecycle. Every commit that passes automated linting, unit testing, security scanning, and staging integration tests is released directly into live production without human intervention.
    * **The Defining Attribute**: There is **zero human intervention** between a developer committing verified code and that code running in live production. If all automated quality gates, security scans, integration tests, and staging smoke tests pass, the pipeline deploys the change directly to production users automatically.
 
 4. **GitOps**:
-   * *Book Definition*: GitOps is an operating model for cloud-native applications that uses Git version control as the single source of truth for declarative infrastructure and application configurations, enforced via continuous automated reconciliation.
+   * **Definition**: An operational paradigm for cloud-native applications (popularized by Weaveworks and formalized by OpenGitOps) where **Git repositories act as the single source of truth** for declarative infrastructure and application manifests.
    * **Core Principle**: Rather than having engineers or CI runners run manual `kubectl apply` commands against live clusters, the desired state of the cluster is committed declaratively to a Git repository. Specialized in-cluster controllers (such as ArgoCD or Flux) continuously reconcile the live cluster state with the configuration in Git.
 
 ---
@@ -217,8 +217,7 @@ flowchart TD
 
 ## 📈 5. The 4 DORA Metrics (What Elite Engineering Teams Measure)
 
-> **Book Definition**:
-> *DORA Metrics*: Four foundational DevOps benchmarks (Deployment Frequency, Lead Time for Changes, Change Failure Rate, and Time to Restore Service) established by Google's DevOps Research and Assessment team to measure software delivery velocity and stability.
+> **DORA Metrics**: Four foundational DevOps benchmarks (Deployment Frequency, Lead Time for Changes, Change Failure Rate, and Time to Restore Service) established by Google's DevOps Research and Assessment team to measure software delivery velocity and stability.
 
 Google's DevOps Research and Assessment (DORA) identifies four metrics that distinguish top-performing engineering organizations:
 

@@ -35,8 +35,8 @@ flowchart LR
 
 ## 📖 1. Comprehensive Study Notes: Understanding DevSecOps & Supply Chain Defense from the Ground Up
 
-### What is DevSecOps and "Shift-Left"? (Straightforward Definition & Context)
-> **Book Definition**: DevSecOps is an organizational software engineering culture that automates the integration of security practices and compliance gates at every phase of the software delivery lifecycle.
+### What is DevSecOps and "Shift-Left"?
+DevSecOps is an organizational software engineering culture that automates the integration of security practices and compliance gates at every phase of the software delivery lifecycle.
 
 **DevSecOps** is the cultural, architectural, and operational engineering practice of integrating automated security testing, vulnerability management, and compliance controls into every stage of the software delivery lifecycle—from initial coding to automated testing, container packaging, and production runtime.
 
@@ -54,27 +54,22 @@ Modern CI/CD pipelines erect an automated, defense-in-depth security perimeter u
    * **The Mechanics**: Secret scanners use regex pattern matching and Shannon entropy algorithms to detect high-randomness strings within source code, commit messages, and PR diffs. When configured as git `pre-commit` hooks or CI checks, they reject commits before credentials can be pushed to remote repositories.
 
 2. **Static Application Security Testing - SAST (SonarQube, GitHub CodeQL, Semgrep)**:
-   * *Book Definition*: Static Application Security Testing (SAST) is a white-box testing methodology that analyzes source code, byte code, or binaries for security vulnerabilities without executing the program.
    * **The Mechanics**: SAST tools perform "white-box" analysis by scanning raw application source code without executing it.
    * They build an Abstract Syntax Tree (AST) and perform taint analysis—tracking how untrusted user inputs (sources) flow through application logic to sensitive database queries or system calls (sinks). This catches critical programming bugs like SQL injection, cross-site scripting (XSS), path traversal, and insecure deserialization.
 
 3. **Software Composition Analysis - SCA (Snyk, Dependabot, OWASP Dependency-Check)**:
-   * *Book Definition*: Software Composition Analysis (SCA) is an automated security process that identifies and tracks open-source components, license compliance, and known vulnerabilities (CVEs) within an application's dependency tree.
    * **The Mechanics**: Over 85% of modern enterprise application code consists of third-party open-source dependencies (Maven artifacts, npm packages, Python wheels, Go modules).
    * SCA scanners parse lockfiles (`pom.xml`, `package-lock.json`, `go.sum`), extract the full dependency tree (including transitive dependencies), and compare them against national vulnerability databases (e.g., NIST NVD, GitHub Advisory Database) to identify known Common Vulnerabilities and Exposures (CVEs). They automatically generate Pull Requests to upgrade libraries to patched versions.
 
 4. **Container Image Scanning (Aqua Trivy, Grype)**:
-   * *Book Definition*: Container Scanning is the automated inspection of container image layers, base OS packages, and language dependencies to detect known vulnerabilities before deployment.
    * **The Mechanics**: A container image is not just application code; it bundles an entire miniature Linux operating system (Debian, Ubuntu, Alpine) with hundreds of system utilities and shared libraries (OpenSSL, curl, glibc).
    * Scanners like Trivy unpack OCI image layers, index all installed OS packages and language runtimes, and report vulnerabilities with Common Vulnerability Scoring System (CVSS) ratings. CI pipelines enforce thresholds (e.g., `exit-code: 1` on `CRITICAL,HIGH`), automatically blocking vulnerable images from publishing to registries.
 
 5. **Dynamic Application Security Testing - DAST (OWASP ZAP, StackHawk)**:
-   * *Book Definition*: Dynamic Application Security Testing (DAST) is a black-box security testing methodology that probes an active, running application from the outside to identify exploitable security vulnerabilities.
    * **The Mechanics**: DAST conducts "black-box" testing against a live, running instance of the application in an ephemeral staging environment.
    * Acting like an automated penetration tester, the tool sends malformed HTTP payloads, tests for insecure HTTP headers, probes for authentication bypasses, and checks for CORS and SSL/TLS misconfigurations from the outside.
 
 6. **Image Signing & Supply Chain Provenance (Sigstore Cosign & Kyverno)**:
-   * *Book Definition*: Cosign is an open-source container signing tool from the Sigstore project that facilitates container signing, verification, and storage in OCI registries to ensure software supply chain integrity.
    * **The Mechanics**: Prevents container registry tampering and unauthorized deployments. During the CI build, after all tests and vulnerability scans pass, **Cosign** digitally signs the container image digest using public-key cryptography.
    * Inside the production Kubernetes cluster, an Admission Controller (e.g., **Kyverno** or **OPA Gatekeeper**) intercepts pod creation requests. It cryptographically verifies that the image was signed by the official CI pipeline key. Unsigned or tampered images are instantly blocked from running.
 

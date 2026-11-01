@@ -83,8 +83,8 @@ flowchart TD
 
 ## 📖 1. Comprehensive Study Notes: Understanding Consumer Groups, Rebalances & Offsets from the Ground Up
 
-### What is a Consumer Group? (Straightforward Definition & Context)
-> **Book Definition**: A Consumer Group is a cooperative set of independent consumer processes identified by a shared group ID that collaborate to consume data in parallel from a set of topic partitions.
+### What is a Consumer Group?
+A **Consumer Group** is a cooperative set of independent consumer processes identified by a shared group ID that collaborate to consume data in parallel from a set of topic partitions.
 
 A **Consumer Group** is a cooperative set of independent consumer processes (e.g., microservice instances or background workers) that share a common identifier (`group.id`) and work together to read, process, and scale message consumption from one or more Kafka topics.
 
@@ -102,7 +102,7 @@ Kafka's Consumer Group unifies both paradigms cleanly into a single architecture
 Understanding consumer internals requires tracing how consumers join a group, process records, and record their progress:
 
 1. **Group Coordination & Partition Assignment**:
-   * *Book Definition (Group Coordinator)*: The Group Coordinator is a designated Kafka broker responsible for managing consumer group membership, tracking heartbeats, and orchestrating partition rebalances.
+   * **Group Coordinator**: A designated Kafka broker responsible for managing consumer group membership, tracking heartbeats, and orchestrating partition rebalances.
    * When a consumer starts up with a specified `group.id`, it sends a `FindCoordinator` request to any Kafka broker. Kafka hashes the `group.id` and assigns a specific broker to act as the **Group Coordinator** for that consumer group.
    * The consumer sends a `JoinGroup` request to the coordinator. The coordinator elects one consumer in the group to be the **Group Leader** (typically the first consumer to join).
    * The Group Leader runs a partition assignment strategy (such as `RoundRobinAssignor` or `CooperativeStickyAssignor`) to assign specific topic partitions to each member of the group.
@@ -114,7 +114,7 @@ Understanding consumer internals requires tracing how consumers join a group, pr
    * The application thread iterates over the batch, executes business logic (e.g., validation, database writes, external API calls), and then commits its progress.
 
 3. **Offset Tracking via `__consumer_offsets`**:
-   * *Book Definition (__consumer_offsets)*: __consumer_offsets is an internal, compacted Kafka system topic that durably persists committed consumer group offset bookmarks per topic-partition.
+   * **`__consumer_offsets`**: An internal, compacted Kafka system topic that durably persists committed consumer group offset bookmarks per topic-partition.
    * Kafka does not maintain per-message acknowledgments like traditional brokers. Instead, it tracks consumer progress through a continuous sequence integer called an **Offset**.
    * When a consumer commits an offset (e.g., offset 105), it tells Kafka: *"I have completely processed all records up through offset 104; the next record I expect to read is 105."*
    * Kafka stores these committed offsets inside an internal, high-throughput, compacted topic called **`__consumer_offsets`** (partitioned by hash of `group.id`).
@@ -125,7 +125,7 @@ Understanding consumer internals requires tracing how consumers join a group, pr
    * **Application Processing Liveness (`max.poll.interval.ms`)**: Heartbeats only prove that the consumer process and its background thread are alive; they do not prove that the main application thread is successfully processing data. If an application thread hangs (e.g., waiting indefinitely on a locked database table or an unresponsive HTTP API) and fails to invoke `poll()` within `max.poll.interval.ms` (default 5 minutes), the coordinator marks the consumer as livelocked and kicks it out of the group.
 
 5. **Rebalances (Eager vs. Cooperative Sticky)**:
-   * *Book Definition (Rebalance)*: A Rebalance is a coordinated distributed protocol during which Kafka reassigns partition ownership across active members of a consumer group in response to membership or topology changes.
+   * **Rebalance Protocol**: A coordinated distributed protocol during which Kafka reassigns partition ownership across active members of a consumer group in response to membership or topology changes.
    * Whenever group membership changes (a consumer joins, crashes, or departs gracefully) or topic partitions increase, Kafka executes a **Rebalance** to redistribute partitions.
    * **Eager Rebalancing (Legacy)**: Consumers revoke all assigned partitions, halt processing entirely across the entire group ("Stop-The-World"), rejoin the group, and wait for new assignments. This causes severe latency spikes in production.
    * **Cooperative Sticky Rebalancing (Modern Standard - KIP-429)**: Rebalancing occurs incrementally over two rounds. Consumers continue processing unaffected partitions uninterrupted. Only the specific partitions that must move to a new consumer are briefly paused and reassigned.
@@ -137,7 +137,7 @@ Understanding consumer internals requires tracing how consumers join a group, pr
 * **Resilient Automatic Failover**: If a consumer pod experiences an Out-Of-Memory (OOM) error or hardware failure, Kafka automatically detects the dead consumer, redistributes its partitions to surviving group members, and resumes consumption from the last committed offset within seconds.
 * **Deterministic Reprocessing & Time-Travel Debugging**: Because Kafka preserves committed offsets in `__consumer_offsets` and retains historical log segments on disk, engineers can reset a consumer group's offsets backward in time (`--to-offset` or `--to-datetime`). This enables full reprocessing of historical data if a bug corrupted downstream databases.
 * **Actionable Operational Visibility via Consumer Lag**:
-  - *Book Definition (Consumer Lag)*: Consumer Lag is the numerical difference between the Log End Offset (LEO) of a partition and the current committed offset of a consumer group, measuring unprocessed message backlog.
+  - Consumer Lag is the numerical difference between the Log End Offset (LEO) of a partition and the current committed offset of a consumer group, measuring unprocessed message backlog.
   - By subtracting the consumer's current offset from the Log End Offset (LEO), operations teams obtain a real-time metric of **Consumer Lag**. This reveals whether downstream processing is keeping pace with upstream production and allows auto-scaling policies to trigger before backpressure threatens system stability.
 
 ---
