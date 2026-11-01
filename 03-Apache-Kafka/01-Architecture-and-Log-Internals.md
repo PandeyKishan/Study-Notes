@@ -113,13 +113,27 @@ Modern distributed systems adopt Kafka because synchronous point-to-point commun
 
 ## 📖 2. Core Vocabulary (Plain-English Definitions)
 
-- **Event / Record**: An immutable unit of data in Kafka recording something that happened in the business domain (Key, Value, Timestamp, Headers).
-- **Producer**: The client application that creates, publishes, and sends event records to Kafka topics.
-- **Consumer**: The client application that subscribes to one or more Kafka topics to read and process published event records.
-- **Broker**: A single Kafka server node that receives, stores, serves, and replicates event logs within a cluster.
-- **Topic**: A named logical channel or category where records are published and from which consumers read (e.g., `orders`, `user-signups`).
-- **Partition**: Topics are split into **Partitions** (ordered, immutable, append-only commit log sequences) for horizontal scalability and parallel processing.
-- **Offset**: A unique sequential, monotonically increasing 64-bit integer assigned to each record within a partition. It acts as a **bookmark** indicating which message a consumer has read up to.
+- **Event / Record**:
+  - An event (or record) is an immutable unit of data in Kafka consisting of a timestamp, optional key, payload value, and optional metadata headers.
+  - A piece of data recording something that happened in the business domain (Key, Value, Timestamp, Headers).
+- **Producer**:
+  - A producer is a client application that publishes (writes) streams of event records into Kafka topics.
+  - The application that creates and sends events to Kafka.
+- **Consumer**:
+  - A consumer is a client application that subscribes to one or more Kafka topics to read and process published event records.
+  - The application that reads and processes events from Kafka.
+- **Broker**:
+  - A broker is a standalone Kafka server node that receives, stores, serves, and replicates event logs within a cluster.
+  - A single Kafka server. A Kafka cluster is a group of brokers working together.
+- **Topic**:
+  - A topic is a logical channel or category to which event records are published and from which consumers read.
+  - A named channel or category where records are published (e.g., `orders`, `user-signups`).
+- **Partition**:
+  - A partition is an ordered, immutable, append-only commit log sequence that acts as the basic unit of parallelism and storage distribution for a Kafka topic.
+  - Topics are split into **Partitions** (shards) for horizontal scalability and parallel processing.
+- **Offset**:
+  - An offset is a monotonically increasing 64-bit integer assigned to every message within a partition that uniquely identifies its sequential position in the commit log.
+  - A unique sequential integer assigned to each record within a partition. It acts as a **bookmark** indicating which message a consumer has read up to.
 
 ```mermaid
 flowchart TD
@@ -229,9 +243,15 @@ flowchart TD
 ```
 
 ### The Three Critical Acronyms:
-1. **LEO (Log End Offset)**: The offset of the next message to be written into a partition log on a specific broker replica.
-2. **ISR (In-Sync Replicas)**: The set of broker replicas that are actively caught up with the leader within the configured replica lag time threshold (`replica.lag.time.max.ms`).
-3. **HW (High Watermark)**: The highest offset that has been replicated to **all members of the ISR**, establishing the boundary of messages visible to consumers.
+1. **LEO (Log End Offset)**:
+   - Log End Offset (LEO) is the offset of the next record to be written into a partition log on a specific broker replica.
+   - The offset of the next message to be written.
+2. **ISR (In-Sync Replicas)**:
+   - In-Sync Replicas (ISR) is the dynamic subset of partition replicas that are actively caught up with the partition leader within the configured replica lag time threshold (`replica.lag.time.max.ms`).
+   - The set of broker replicas that are caught up with the leader.
+3. **HW (High Watermark)**:
+   - The High Watermark (HW) is the highest offset in a partition that has been successfully replicated across all members of the ISR, establishing the boundary of messages visible to consumers.
+   - The highest offset that has been replicated to **all members of the ISR**.
    > **The Visibility Guarantee**: Consumers can **only read up to the High Watermark**. Uncommitted messages past the HW are invisible to consumers. If the leader broker dies, the new leader is guaranteed to have all committed messages!
 
 ---

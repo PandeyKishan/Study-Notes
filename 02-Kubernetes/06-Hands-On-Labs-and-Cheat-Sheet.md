@@ -139,8 +139,12 @@ sequenceDiagram
     Pod-->>Op: Status Updates
     Op->>API: Update CRD Status (Ready)
 ```
-* **CRD (Custom Resource Definition):** Extends the Kubernetes API (e.g., creating a `Database` or `Certificate` resource type) without modifying the core codebase.
-* **Operator:** A pod running a custom controller that watches CRDs and makes the cluster match the desired state by creating native resources (Pods, Deployments, etc.), automating application management on behalf of a human operator.
+* **CRD (Custom Resource Definition):**
+  - A Custom Resource Definition (CRD) is an extension mechanism that allows users to introduce custom object types into the Kubernetes API without modifying the core codebase.
+  - Extends the Kubernetes API (e.g., creating a `Database` or `Certificate` resource type).
+* **Operator:**
+  - An Operator is an application-specific controller that extends the Kubernetes API to automate the creation, configuration, and management of complex stateful applications on behalf of a human operator.
+  - A pod running a custom controller that watches CRDs and makes the cluster match the desired state by creating native resources (Pods, Deployments, etc.).
 
 ---
 

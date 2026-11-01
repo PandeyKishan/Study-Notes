@@ -77,8 +77,8 @@ Here are the essential instructions every developer and DevOps engineer must kno
 - *Best Practice*: Always use `WORKDIR /app` instead of running `RUN cd /app`. `WORKDIR` will automatically create the folder if it does not exist.
 
 ### 3. `COPY` vs. `ADD` (The File Transfer)
-- **`COPY <src> <dest>`**: Copies files from your local computer into the container filesystem. Simple, safe, and transparent.
-- **`ADD <src> <dest>`**: Does what `COPY` does, PLUS two magic features: it can auto-extract local `.tar.gz` archives, and download files from remote URLs.
+- **`COPY <src> <dest>`**: Copies new files or directories from the local build context into the container filesystem at the specified destination path. Simple, safe, and transparent.
+- **`ADD <src> <dest>`**: Copies files, directories, or remote URLs to the destination path, automatically decompressing recognized archive formats into directory trees. Does what `COPY` does, PLUS two magic features: it can auto-extract local `.tar.gz` archives, and download files from remote URLs.
 - *Best Practice*: **99% of the time, use `COPY`**. Only use `ADD` when you explicitly need to unpack a local `.tar` file into the container.
 
 ### 4. `RUN` (Build-Time Execution)
@@ -87,8 +87,8 @@ Here are the essential instructions every developer and DevOps engineer must kno
 - *Example*: `RUN npm install` or `RUN apt-get update && apt-get install -y curl`.
 
 ### 5. `ENV` vs. `ARG` (Variables Explained)
-- **`ARG` (Build-Time Only)**: Available *only* while the image is being built with `docker build --build-arg VERSION=1.2`. Once the image is built, the ARG vanishes.
-- **`ENV` (Runtime Environment Variable)**: Persists inside the image and is available to the running container process (`process.env.DB_HOST`).
+- **`ARG` (Build-Time Only)**: Declares a parameter variable that users can pass at build-time to Docker using the `docker build --build-arg` flag. Available *only* while the image is being built with `docker build --build-arg VERSION=1.2`. Once the image is built, the ARG vanishes.
+- **`ENV` (Runtime Environment Variable)**: Sets key-value environment variables that persist in the image and remain accessible to all container runtime processes. Persists inside the image and is available to the running container process (`process.env.DB_HOST`).
 
 ### 6. `EXPOSE` (Documentation Port)
 - Documents the specific network ports and protocols on which the containerized service expects incoming traffic at runtime.

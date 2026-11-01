@@ -173,16 +173,16 @@ flowchart LR
 
 | Type | How It Works | Best Use Case | Command Example |
 | :--- | :--- | :--- | :--- |
-| **Named Volume** | Docker creates and manages a folder inside `/var/lib/docker/volumes/`. High performance, completely independent of host directory structure and isolated from host directory changes. | **Production Databases (PostgreSQL, MySQL, MongoDB), Kafka logs.** | `docker run -v pg_data:/var/lib/postgresql/data postgres:15` |
-| **Bind Mount** | Directly mounts an exact file or folder from your computer into the container, mirroring host permissions. | **Local Development**: Mount your local source code into the container so you can edit code and see hot-reloading without rebuilding images! | `docker run -v $(pwd)/src:/app/src node:20` |
-| **`tmpfs` Mount** | Stores data purely in the host machine's RAM memory as volatile storage. Never writes to disk. | **Sensitive tokens, passwords, private keys** that must vanish the second the container stops. | `docker run --tmpfs /tmp/secrets my-app` |
+| **Named Volume** | A persistent storage directory managed entirely by the Docker daemon at `/var/lib/docker/volumes/`, isolated from host directory changes. High performance, completely independent of host directory structure. | **Production Databases (PostgreSQL, MySQL, MongoDB), Kafka logs.** | `docker run -v pg_data:/var/lib/postgresql/data postgres:15` |
+| **Bind Mount** | A direct filesystem mapping that mounts a file or directory from the host machine directly into a container path, mirroring host permissions. Directly mounts an exact file or folder from your computer into the container. | **Local Development**: Mount your local source code into the container so you can edit code and see hot-reloading without rebuilding images! | `docker run -v $(pwd)/src:/app/src node:20` |
+| **`tmpfs` Mount** | A volatile storage mount located entirely within host system RAM that never commits data to underlying disk storage. Stores data purely in the host machine's RAM memory. Never writes to disk. | **Sensitive tokens, passwords, private keys** that must vanish the second the container stops. | `docker run --tmpfs /tmp/secrets my-app` |
 
 ---
 
 ## 🎼 5. Docker Compose: The Conductor of Multi-Container Apps
 
 ### What is Docker Compose?
-**Docker Compose** is a tool for defining and running multi-container Docker applications using a single declarative YAML file (`compose.yaml` or `docker-compose.yml`).
+**Docker Compose** is a declarative orchestration tool for defining, configuring, and executing multi-container Docker applications using structured YAML configuration files (`compose.yaml` or `docker-compose.yml`).
 
 ### Production-Ready Example: Frontend + Spring Boot Backend + PostgreSQL + Kafka
 *(Aligned with our Hands-On Capstone Project)*

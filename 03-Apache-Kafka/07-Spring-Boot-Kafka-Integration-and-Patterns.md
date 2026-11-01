@@ -72,8 +72,12 @@ flowchart TD
 ```
 
 ### Key Abstractions:
-- **`KafkaTemplate`**: A thread-safe, high-level Spring wrapper that wraps an Apache Kafka Producer to execute asynchronous message publication via CompletableFutures. It handles connection pooling, metric collection, and serialization natively.
-- **`@KafkaListener`**: A Spring annotation used to declare a managed method endpoint that automatically consumes and deserializes messages from designated Kafka topics. It marks methods that receive incoming messages.
+- **`KafkaTemplate`**:
+  - KafkaTemplate is a high-level, thread-safe Spring abstraction that wraps an Apache Kafka Producer to execute asynchronous message publication via CompletableFutures.
+  - A thread-safe, high-level wrapper for producing messages. It handles connection pooling, metric collection, and serialization natively.
+- **`@KafkaListener`**:
+  - @KafkaListener is a Spring annotation used to declare a managed method endpoint that automatically consumes and deserializes messages from designated Kafka topics.
+  - The annotation marking methods that receive incoming messages.
 - **`MessageListenerContainer`**: The backbone of `@KafkaListener`. It manages consumer threads, offset commits, partition rebalances, and polling loops continuously in the background.
 - **`ConcurrentKafkaListenerContainerFactory`**: Factory to create container instances. You configure consumer properties (like concurrency, error handlers, and message converters) here.
 

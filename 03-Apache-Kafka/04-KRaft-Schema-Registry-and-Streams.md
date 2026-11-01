@@ -193,7 +193,7 @@ flowchart LR
 ```
 
 > **The Tombstone Record**:
-> **The Tombstone Record**: A tombstone is a record published with a non-null key and a null payload that explicitly marks that key for deletion in a compacted topic.
+> **The Tombstone Record**: A tombstone is a record published with a non-null key and a null payload that explicitly marks that key for deletion in a compacted topic. To completely delete a key from a compacted topic, a producer writes a record with that key and a `null` value. The compactor retains the tombstone for `delete.retention.ms` before permanently scrubbing the key from disk. To completely delete a key from a compacted topic, a producer writes a record with that key and a `null` value. The compactor retains the tombstone for `delete.retention.ms` before permanently scrubbing the key from disk.
 > To completely delete a key from a compacted topic, a producer writes a record with that key and a `null` value. The compactor retains the tombstone for `delete.retention.ms` before permanently scrubbing the key from disk.
 
 ---
